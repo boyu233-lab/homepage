@@ -166,6 +166,7 @@ curl -i http://群晖IP:3000/manage
 | 反代后反复跳回登录页 | `NEXTAUTH_URL` 写成 `http`，实际访问是 `https`（或反之） | 改成与实际协议一致，并在反代里正确传 `X-Forwarded-Proto` |
 | 管理页保存报 500 | 配置目录 UID 1000 不可写 | 重做第 4 节 `chown`；看容器日志确认 |
 | 匿名访问 `/api/config/bookmarks` 返回 401 | **这是预期行为**，不是故障 | 登录后才有权限 |
+| 首页出现 `My First Group` / `My Second Group` / `My Third Group` 三个示例服务 | 挂载目录里没有 `services.yaml`，应用启动时按官方逻辑从 `src/skeleton/` 自动拷贝了示例配置（同理还有 `settings.yaml` / `docker.yaml` / `kubernetes.yaml` / `proxmox.yaml` / `custom.js` / `custom.css`） | 在 NAS 配置目录新建 `services.yaml`，内容为 `---` 换行 `[]` 两行即可清空服务区；或填自己的真实服务。改完重建项目。注意 `settings.yaml` 的 skeleton 版含假的天气 API key，不用天气组件可忽略 |
 | ARM 机型启动失败 `exec format error` | 镜像是 amd64 | 自行构建 arm64 镜像 |
 
 > **旧镜像临时绕过**（只在无法重新拉取时用）：在 compose 的 `homepage` 服务下加下面两行，启动时先把 `\r` 去掉再执行入口脚本，CMD 保持原样。
