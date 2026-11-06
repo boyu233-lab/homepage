@@ -12,16 +12,16 @@ ARG CI
 ARG BUILDTIME
 ARG VERSION
 ARG REVISION
-# 国内构建时可传 --build-arg PNPM_REGISTRY=https://registry.npmmirror.com，
-# corepack 下载 pnpm 与 pnpm install 都走该镜像；默认仍是官方 npmjs（CI 无影响）。
+# 国内构建时可传 --build-arg PNPM_REGISTRY=https://registry.npmmirror.com；
+# 默认仍是官方 npmjs（CI 无影响）。用 npm 全局装固定版本 pnpm，绕开 corepack
+# 下载平台二进制（@pnpm/exe.*）在部分网络下会 fetch failed 的问题。
 ARG PNPM_REGISTRY=https://registry.npmjs.org
 ENV CI=$CI
-ENV COREPACK_NPM_REGISTRY=$PNPM_REGISTRY
 ENV npm_config_registry=$PNPM_REGISTRY
 
 # Install and build only outside CI
 RUN if [ "$CI" != "true" ]; then \
-      corepack enable && corepack prepare pnpm@latest --activate && \
+      npm install -g "pnpm@12.16.1" --registry="$PNPM_REGISTRY" && \
       pnpm install --frozen-lockfile --prefer-offline && \
       NEXT_TELEMETRY_DISABLED=1 \
       NEXT_PUBLIC_BUILDTIME=$BUILDTIME \
