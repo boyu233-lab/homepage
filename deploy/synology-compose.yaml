@@ -1,65 +1,19 @@
-# =============================================================================
-# Homepage 书签管理版 · 群晖 DSM 7.2 Container Manager「项目」专用 Compose
-# 配套说明：deploy/群晖Docker部署方法.md
-# =============================================================================
-# 特点：直接拉取已构建好的镜像，不在 NAS 上编译；所有变量都写在本文件里，
-#       不依赖 .env（Container Manager 粘贴 YAML 时读不到 .env 的 ${} 变量）。
-#
-# ★ 启动前必须改的 3 类占位符（搜索 CHANGE_ME）：
-#   1) HOMEPAGE_AUTH_PASSWORD   -> 自己生成的强密码
-#   2) NEXTAUTH_SECRET          -> 自己生成的 >=32 位随机值
-#   3) NEXTAUTH_URL / HOMEPAGE_ALLOWED_HOSTS -> 群晖实际访问地址（含端口）
-#   另外把 volumes 左侧的 /volume1/docker/homepage/config 改成真实共享文件夹路径。
-#
-# ⚠️ 本文件会提交到 GitHub，鉴权凭据只能放占位符；真实口令 / secret 绝不写进来，
-#    也不要把填好真实值的版本截图或分享出去。
-# =============================================================================
-
+# 启动前改 3 类 CHANGE_ME（密码 / secret / 访问地址）与 volumes 左侧路径
 services:
   homepage:
-    # 已发布到 Docker Hub 的公开镜像（linux/amd64，免登录拉取）。
-    # 回滚用固定版本标签：boyu233/homepage-bookmark-manager:sha-2b5aefa
     image: boyu233/homepage-bookmark-manager:latest
     container_name: homepage
     restart: unless-stopped
-
-    # 左侧是群晖端口，右侧容器内固定 3000。3000 被占用时改左侧，如 "3001:3000"
     ports:
       - "3000:3000"
-
     environment:
-      # ---- 鉴权：四项必需，缺一会导致登录页报 "Authentication error" ----
       HOMEPAGE_AUTH_ENABLED: "true"
       HOMEPAGE_AUTH_PASSWORD: "CHANGE_ME_STRONG_PASSWORD"
       NEXTAUTH_SECRET: "CHANGE_ME_RANDOM_SECRET_AT_LEAST_32_CHARS"
       NEXTAUTH_URL: "http://192.168.1.100:3000"
-
-      # 实际访问时会用到的全部 host（含端口），逗号分隔。
-      # NEXTAUTH_URL 里的 host 会被自动信任；用其它 IP / 域名访问时都要列进来，
-      # 否则会被 400 Host validation failed 拦住。
       HOMEPAGE_ALLOWED_HOSTS: "192.168.1.100:3000"
-
-      # ---- 配置目录：容器内路径固定，必须可写，否则书签保存会 500 ----
       HOMEPAGE_CONFIG_DIR: "/app/config"
       TZ: "Asia/Shanghai"
       PORT: "3000"
-
-      # 可选：追加匿名可读的只读端点，逗号分隔，支持 * 前缀。
-      # 切勿把 /api/config/bookmarks、/api/services/proxy、/api/revalidate、/api/mcp 加进来。
-      # HOMEPAGE_PUBLIC_READ_PATHS: ""
-
     volumes:
-      # 左侧改成群晖真实路径；目录需预先存在，并允许 UID 1000 写入
       - /volume1/docker/homepage/config:/app/config
-      # 仅当 services.yaml 里用到 Docker / 服务状态组件时才放开（有安全风险，一般不需要）
-      # - /var/run/docker.sock:/var/run/docker.sock:ro
-
-    # 镜像自带 HEALTHCHECK（GET /api/healthcheck），此处不重复定义。
-    # -------------------------------------------------------------------------
-    # 备选：让群晖自己构建镜像（需把整个仓库放在项目目录里，且机型内存 >= 2GB）
-    # 把上面的 image 行替换成下面三行：
-    #   image: homepage-bookmark-manager:local
-    #   build:
-    #     context: .
-    #     dockerfile: Dockerfile
-    # -------------------------------------------------------------------------

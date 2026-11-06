@@ -99,7 +99,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ### B. 让群晖自己构建
 
-在群晖 SSH 里 `git clone --branch dev --depth 1 <你的 fork 地址>`，把仓库放到项目目录，然后按 `synology-compose.yaml` 末尾注释把 `image` 换成 `build` 段（或直接改用 `deploy/docker-compose.yml` + `.env`）。首次 `pnpm install` + `next build` 需要数分钟、建议内存 ≥ 2GB。
+在群晖 SSH 里 `git clone --branch dev --depth 1 <你的 fork 地址>`，把仓库放到项目目录，改用 `deploy/docker-compose.yml` + `.env` 启动（这份模板自带 `build` 段）。首次 `pnpm install` + `next build` 需要数分钟、建议内存 ≥ 2GB。
 
 ### C. 本机构建后导出 tar 上传（完全不依赖 Docker Hub）
 
