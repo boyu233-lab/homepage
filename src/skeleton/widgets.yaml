@@ -1,6 +1,5 @@
----
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/info-widgets/
+# Homepage - 顶部信息组件
+# 保留原有 CPU、内存、根目录磁盘和 DuckDuckGo 搜索
 
 - resources:
     cpu: true

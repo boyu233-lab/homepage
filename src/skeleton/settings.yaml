@@ -1,7 +1,34 @@
 ---
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/settings/
+# Homepage fork - 主题与布局（配合 custom.js / custom.css）
+# 本文件可整份覆盖；不会动 bookmarks.yaml，你的书签数据不受影响。
 
-providers:
-  openweathermap: openweathermapapikey
-  weatherapi: weatherapiapikey
+title: Homepage
+language: zh-Hans
+
+theme: dark
+color: purple
+
+# 极光背景由 custom.css 纯 CSS 实现，不需要图片、不需要额外挂载。
+headerStyle: clean
+cardStyle: hairline
+blockStyle: refined
+
+fullWidth: true
+useEqualHeights: true
+target: _blank
+
+# 左侧分组导航由 custom.js 接管，必须关闭原生折叠以免冲突。
+disableCollapse: true
+hideVersion: true
+
+# 可选：给自己的书签分组指定图标与顺序。
+# 名称必须与 bookmarks.yaml 里的分组名完全一致；没列出的分组排在后面，不受影响。
+# 需要时取消注释，把「你的分组名」换成真实名称：
+# layout:
+#   你的分组名:
+#     icon: mdi-folder-outline
+
+quicklaunch:
+  searchDescriptions: true
+  hideInternetSearch: false
+  hideVisitURL: false

@@ -1,18 +1,74 @@
 ---
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/bookmarks
+# Homepage 书签配置 — 演示版（已脱敏，仅含公开演示地址）
+# 字段说明:
+#   abbr        : 无图标时显示的字母块(保留作降级)
+#   icon        : 图标。mdi-xxx = 单色剪影(npm CDN, 国内最稳)
+#   id          : tile-* 彩色高亮瓷砖, 见 custom.css; 不需要彩色就删掉这一行
+#   description : " " 用于覆盖默认显示的域名, 保持空白即可
 
-- Developer:
-    - Github:
+# 搜索引擎
+- 搜索引擎:
+    - 百度:
+        - abbr: BD
+          href: https://www.baidu.com/
+          icon: mdi-web
+          description: " "
+          id: tile-purple
+    - Google:
+        - abbr: G
+          href: https://www.google.com/
+          icon: mdi-google
+          description: " "
+          id: tile-blue
+    - Bing:
+        - abbr: B
+          href: https://www.bing.com/
+          icon: mdi-web
+          description: " "
+    - Wikipedia:
+        - abbr: WIKI
+          href: https://www.wikipedia.org/
+          icon: mdi-wikipedia
+          description: " "
+
+# 社区与开发
+- 社区与开发:
+    - GitHub:
         - abbr: GH
           href: https://github.com/
-
-- Social:
-    - Reddit:
-        - abbr: RE
-          href: https://reddit.com/
-
-- Entertainment:
+          icon: mdi-github
+          description: " "
+          id: tile-white
     - YouTube:
         - abbr: YT
           href: https://youtube.com/
+          icon: mdi-youtube
+          description: " "
+          id: tile-red
+    - Reddit:
+        - abbr: RE
+          href: https://reddit.com/
+          icon: mdi-reddit
+          description: " "
+          id: tile-orange
+    - Linux.do:
+        - abbr: LD
+          href: https://linux.do/
+          icon: mdi-forum
+          description: " "
+          id: tile-teal
+    - 恩山论坛:
+        - abbr: 恩
+          href: https://www.right.com.cn/FORUM/
+          icon: mdi-forum
+          description: " "
+    - Nodeseek:
+        - abbr: N
+          href: https://www.nodeseek.com/
+          icon: mdi-account-group
+          description: " "
+    - TypingClub:
+        - abbr: T
+          href: https://www.typingclub.com/
+          icon: mdi-keyboard
+          description: " "

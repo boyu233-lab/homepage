@@ -1,18 +1,13 @@
 ---
-# For configuration options and examples, please see:
-# https://gethomepage.dev/configs/services/
-
-- My First Group:
-    - My First Service:
-        href: http://localhost/
-        description: Homepage is awesome
-
-- My Second Group:
-    - My Second Service:
-        href: http://localhost/
-        description: Homepage is the best
-
-- My Third Group:
-    - My Third Service:
-        href: http://localhost/
-        description: Homepage is 😎
+# 本文件留空:所有导航分组都在 bookmarks.yaml 里,原来的三个官方演示分组已移除。
+# 用 [] 表示空列表(不要只留注释,否则解析成 null 可能导致 Homepage 报错)。
+#
+# 如果以后要加"服务"(带状态检测、ping、容器统计等),可照下面写:
+# - 分组名:
+#     - 服务名:
+#         href: http://192.168.1.100:8080
+#         description: 示例内网服务
+#         icon: mdi-server
+#         # ping: http://192.168.1.100:8080
+# 文档: https://gethomepage.dev/configs/services/
+[]

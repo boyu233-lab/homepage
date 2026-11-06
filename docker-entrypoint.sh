@@ -69,6 +69,35 @@ if [ -d /app/.next ]; then
   fi
 fi
 
+# 历史兼容：早期镜像的 skeleton 里 custom.js / custom.css 是 0 字节，其余为官方默认，
+# 已被拷进持久化配置目录。仅在配置缺失、为空、或与官方默认逐字节一致时用内置定制版补齐；
+# 用户自己编辑过的非空配置一律不动（包括自己的 bookmarks.yaml）。
+CONFIG_DIR=${HOMEPAGE_CONFIG_DIR:-/app/config}
+DEFAULTS=/app/src/skeleton
+BASELINE=/app/skeleton-official
+
+if [ -d "$DEFAULTS" ] && [ -d "$CONFIG_DIR" ]; then
+  for f in custom.js custom.css settings.yaml services.yaml widgets.yaml bookmarks.yaml; do
+    src="$DEFAULTS/$f"
+    dst="$CONFIG_DIR/$f"
+    [ -f "$src" ] || continue
+    apply=0
+    if [ ! -e "$dst" ] || [ ! -s "$dst" ]; then
+      apply=1
+    elif [ -f "$BASELINE/$f" ] && cmp -s "$dst" "$BASELINE/$f"; then
+      apply=1
+    fi
+    if [ "$apply" = 1 ]; then
+      if cp "$src" "$dst" 2>/dev/null; then
+        chown "$PUID:$PGID" "$dst" 2>/dev/null || true
+        echo "Applied bundled default: $f"
+      else
+        echo "Warning: Could not apply bundled default for $f"
+      fi
+    fi
+  done
+fi
+
 # Drop privileges (when asked to) if root, otherwise run as current user
 if [ "$(id -u)" = "0" ] && [ "${PUID}" != "0" ]; then
   exec su-exec ${PUID}:${PGID} "$@"

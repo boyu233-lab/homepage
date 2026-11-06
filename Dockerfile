@@ -54,6 +54,12 @@ RUN tr -d '\r' < /usr/local/bin/docker-entrypoint.sh > /tmp/entrypoint.sh \
 COPY --link --from=builder --chown=1000:1000 /app/.next/standalone/ ./
 COPY --link --from=builder --chown=1000:1000 /app/.next/static/ ./.next/static
 
+# Fork 定制配置（已脱敏）覆盖 standalone 自带的官方 skeleton：
+# 配置目录为空时，应用会自动拷贝这份，直接带上在线壁纸、分组导航与极光主题。
+COPY --link --chown=1000:1000 /src/skeleton/ ./src/skeleton/
+# 官方原版 skeleton 指纹，供入口脚本识别「用户未修改过的默认配置」。
+COPY --link --chown=1000:1000 /deploy/skeleton-official/ ./skeleton-official/
+
 RUN apk add --no-cache su-exec iputils-ping shadow
 
 USER root
