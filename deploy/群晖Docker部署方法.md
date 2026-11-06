@@ -174,9 +174,11 @@ curl -i http://群晖IP:3000/manage
 Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a03:2880:f126:8...]: connect: network is unreachable
 ```
 
-**原因**：`registry-1.docker.io` 被 DNS 污染。`2a03:2880::/32` 是 Facebook 的地址段，IPv4 也常被解析成 Twitter 段 `104.244.46.x`。群晖优先走 IPv6，而家宽通常没有 IPv6 出口，于是卡在 `dial tcp [IPv6]`。**注意**：群晖官方知识库建议把 DNS 改成 `114.114.114.114 / 223.5.5.5`，但实测这两个 DNS 返回的仍是污染地址；仅关 IPv6 也只是换成被污染的 IPv4，通常仍拉不动。所以要换的是「解析目标」，不是 DNS 本身。
+**原因**：`registry-1.docker.io` 被 DNS 污染。`2a03:2880::/32` 是 Facebook 的地址段，IPv4 也常被解析成 Twitter 段 `104.244.46.x`。群晖优先走 IPv6，而家宽通常没有 IPv6 出口，于是卡在 `dial tcp [IPv6]`。关掉 IPv6 后同一个问题会换一种报错：`net/http: request canceled`（IPv4 连接超时）——**只要报错里还写着 `registry-1.docker.io`，就说明镜像加速没生效，问题没解决**。**注意**：群晖官方知识库建议把 DNS 改成 `114.114.114.114 / 223.5.5.5`，但实测这两个 DNS 返回的仍是污染地址；仅关 IPv6 也只是换成被污染的 IPv4，通常仍拉不动。所以要换的是「解析目标」，不是 DNS 本身。
 
-#### 方案 1（推荐）：给 Container Manager 配镜像加速，YAML 不用改
+> **只想最快跑起来**：直接跳到方案 2，把项目 YAML 的 `image` 换成带加速域名的完整地址即可，不用 SSH、不用改 daemon 配置。
+
+#### 方案 1（长期最干净）：给 Container Manager 配镜像加速，YAML 不用改
 
 2026-11-06 实测 `https://docker.1panel.live` 可用：返回的目标镜像 digest 与 Docker Hub 上的 `sha256:89df5596…341d1b` 完全一致，manifest 与镜像层 blob 均可正常下载。
 
