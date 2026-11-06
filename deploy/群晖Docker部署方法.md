@@ -87,11 +87,12 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 | 标签 | 用途 |
 |---|---|
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
-| `boyu233/homepage-bookmark-manager:sha-2b5aefa` | 固定版本，回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-95b63a7` | 当前固定版本（已修复 Windows CRLF 启动失败），回滚 / 复现用 |
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 镜像 digest：`sha256:89df55969cee5ef9fdc5acc7f7cdf23acc94657acda9419d2222f68229e34d1b`（两个标签指向同一镜像）。
+- 当前镜像 digest：`sha256:6a82cfd90492ff260ee6ee222f84282eddd0dba4434eb9e8b1a04da1cb0d01ce`（`latest` 与 `sha-95b63a7` 指向同一镜像）。
+- ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
 
@@ -190,7 +191,9 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
 
 #### 方案 1（长期最干净）：给 Container Manager 配镜像加速，YAML 不用改
 
-2026-11-06 实测 `https://docker.1panel.live` 可用：返回的目标镜像 digest 与 Docker Hub 上的 `sha256:89df5596…341d1b` 完全一致，manifest 与镜像层 blob 均可正常下载。
+2026-11-06 实测 **`https://docker.1ms.run` 可用**：`docker pull` 成功拿到 `sha256:6a82cfd9…d01ce`，拉下来的镜像入口脚本是 LF、能正常启动；`https://hub.rat.dev` 同样可用。推送新镜像后加速源会及时同步。
+
+⚠️ **不要用 `docker.1panel.live` 配 `registry-mirrors` 或加镜像前缀**：它用 `curl` 查 manifest 正常，但 Docker 实际拉取会对 HEAD 请求返回 `403 Forbidden`。`docker.m.daocloud.io` 有镜像白名单，会直接拒绝 `boyu233/homepage-bookmark-manager`（`this image is not in the allowlist`）。**判断加速源能否用，必须以 `docker pull` 实测为准，不能只看 curl 状态码。**
 
 1. 开启群晖 SSH，登录后 `sudo -i` 切 root。
 2. **先看原文件，不要覆盖**（DSM 7.2+ 路径；DSM 7.1 及更早的 Docker 套件是 `/var/packages/Docker/etc/dockerd.json`）：
@@ -206,7 +209,7 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
      "data-root": "/var/packages/ContainerManager/var/docker",
      "log-driver": "db",
      "storage-driver": "btrfs",
-     "registry-mirrors": ["https://docker.1panel.live"]
+     "registry-mirrors": ["https://docker.1ms.run"]
    }
    ```
 
@@ -219,16 +222,16 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
    docker images --digests | grep homepage-bookmark-manager
    ```
 
-   确认 digest 是 `sha256:89df55969cee…341d1b` 再回第 6 节重建项目。
+   确认 digest 是 `sha256:6a82cfd90492…d01ce` 再回第 6 节重建项目。
 
-> 加速站是第三方服务，随时可能失效。备用源可换成 `https://docker.m.daocloud.io`、`https://docker.1ms.run`（实测 `/v2/` 返回 401 属正常，表示服务在线）；换之前先 `curl -I https://<域名>/v2/` 探一下。
+> 加速站是第三方服务，随时可能失效。备用源 `https://hub.rat.dev`（同样实测 `docker pull` 成功）。`/v2/` 返回 401 是正常的鉴权挑战，不代表不可用；**换源前用 `docker pull <源域名>/boyu233/homepage-bookmark-manager:latest` 实测一次**再改配置。
 
 #### 方案 2（不开 SSH）：直接在图形界面拉加速源地址
 
 Container Manager → **映像 → 添加 → 从 URL 添加**，填：
 
 ```
-docker.1panel.live/boyu233/homepage-bookmark-manager:latest
+docker.1ms.run/boyu233/homepage-bookmark-manager:latest
 ```
 
 拉下来后本地镜像名带前缀，因此要把 `synology-compose.yaml` 的 `image` 改成同一串（或 SSH 里 `docker tag` 成不带前缀的名字）。**这份改动只留在 NAS 上，不要提交回 GitHub**，避免公开仓库硬依赖某个第三方加速站。
