@@ -127,6 +127,14 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ### A. 直接拉取已发布镜像（推荐，当前可用）
 
+> ⚠️ **2026-11-06 本次「多引擎搜索 / 时间 / 实时新闻」更新的镜像状态**
+> 新镜像已在本机构建完成并通过容器内实测（`/api/widgets/news` 返回 20 条），但**尚未推送到 Docker Hub**：本机到 `registry-1.docker.io` 直连超时、代理不可用。
+> 因此**此刻从 Hub 拉 `:latest` 拿到的仍是旧镜像** `sha256:d327c0f5…`，不含新闻部件。
+> - 新镜像本地 digest：`sha256:4a78326d80932a326070c652e3d8889530bf7956e5663495cef3fd17500f3198`，本地标签 `:latest` / `:sha-cfea038`（377MB）。
+> - **立即可用**：已导出 `homepage-image-20261106.tar`（OCI 格式 84MB，`docker load` 实测通过），按下面 **C 方案**导入 NAS。
+> - 网络恢复后重推 Hub：执行 `NO_BUILD_PROXY=1 PNPM_REGISTRY=https://registry.npmmirror.com DOCKERHUB_IMAGE=boyu233/homepage-bookmark-manager ./deploy/build-and-push.sh`，随后群晖删旧镜像重拉 `latest`。
+> - 三个部件的升级步骤见 **6.2 节**（除镜像外还要上传一次 `widgets.yaml`）。
+
 镜像已构建并推送到 Docker Hub，**公开仓库、免登录**，`linux/amd64`，YAML 里已填好地址：
 
 | 标签 | 用途 |
@@ -219,7 +227,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ### 已有部署的升级步骤（必做）
 
-1. 删掉 NAS 上的旧镜像 → 重新拉取 `latest`（**新闻部件是新增代码，不重拉镜像不会出现**）。
+1. 更新镜像（**新闻部件是新增代码，不换镜像不会出现**）：Hub 推送恢复后删旧镜像重拉 `latest`；或现在就用 `homepage-image-20261106.tar` 按 5-C 导入，并把 YAML 的 `image` 改成导入后的实际名称。
 2. 把新的 `widgets.yaml` 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖旧文件。**不要动 `bookmarks.yaml`**。可直接用随本次更新提供的 `homepage-widgets-update.zip`。
 3. Container Manager → 项目 → 停止 → 清除并重建（或 SSH `docker compose down && docker compose up -d`）。
 4. 浏览器 **Ctrl+F5** 强制刷新。

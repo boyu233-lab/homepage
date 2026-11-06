@@ -6,6 +6,7 @@
 > 升级做法：删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5。
 >
 > 📌 **但本次「多引擎搜索 / 时间 / 实时新闻」三个部件例外**：它们依赖新版镜像里的代码 + 新的 `widgets.yaml`。
+> 新版镜像当前因本机网络问题暂未推送 Docker Hub，获取方式见部署文档 **5-A**（tar 导入或稍后重推）。
 > 已有部署的 `widgets.yaml` 是用户自己的非空文件，入口脚本不会覆盖，所以**必须手动上传一次本目录的 `widgets.yaml`**（见部署文档 6.2 节）。
 > 只传这一个文件即可，`custom.js` / `custom.css` / `settings.yaml` / `services.yaml` / `bookmarks.yaml` 都不用动。
 

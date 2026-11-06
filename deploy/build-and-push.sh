@@ -51,12 +51,22 @@ if [ -n "${PNPM_REGISTRY:-}" ]; then
   echo "npm 镜像源: ${PNPM_REGISTRY}"
 fi
 
-# 容器内如需走代理，把宿主机代理变量透传（注意 127.0.0.1 在容器内指向容器本身）
-for var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
-  if [ -n "${!var:-}" ]; then
-    BUILD_ARGS+=(--build-arg "${var}=${!var}")
-  fi
-done
+# Docker Desktop 会把宿主机代理注入构建容器，而 127.0.0.1 在容器内指向容器自身，
+# 代理软件没开时会出现 ECONNREFUSED 127.0.0.1:xxxx。设 NO_BUILD_PROXY=1 清空全部代理变量，
+# 让构建容器直连（配合 PNPM_REGISTRY=https://registry.npmmirror.com 效果最好）。
+if [ "${NO_BUILD_PROXY:-0}" = "1" ]; then
+  for var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
+    BUILD_ARGS+=(--build-arg "${var}=")
+  done
+  echo "构建容器代理: 已清空（直连）"
+else
+  # 容器内如需走代理，把宿主机代理变量透传（注意 127.0.0.1 在容器内指向容器本身）
+  for var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
+    if [ -n "${!var:-}" ]; then
+      BUILD_ARGS+=(--build-arg "${var}=${!var}")
+    fi
+  done
+fi
 
 docker build "${BUILD_ARGS[@]}" \
   -t "${IMAGE}:${TAG}" \
