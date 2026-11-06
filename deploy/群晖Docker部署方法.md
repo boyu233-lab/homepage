@@ -1,8 +1,8 @@
 # 群晖 Docker 部署方法（Homepage 书签管理版）
 
 > 配套 YAML：[`synology-compose.yaml`](./synology-compose.yaml)
-> 适用：群晖 DSM 7.2+ / Container Manager，**x86_64 机型**（云端构建的镜像是 `linux/amd64`）
-> 本文与配套 YAML 均同步在 GitHub fork 的 `dev` 分支，示例值全部为占位符，不含真实口令、密钥或私有地址。
+> 适用：群晖 DSM 7.2+ / Container Manager，**x86_64 机型**（已发布的镜像是 `linux/amd64`）
+> 本文与配套 YAML 均同步在 GitHub fork 的 `dev` 分支；镜像地址是已发布的实际地址，鉴权凭据与内网地址仍为占位符，不含真实口令、密钥或私有地址。
 
 ---
 
@@ -80,16 +80,20 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ## 5. 获取镜像（三选一）
 
-### A. GitHub Actions 推 Docker Hub → 群晖拉取（推荐）
+### A. 直接拉取已发布镜像（推荐，当前可用）
 
-官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带 `docker-publish-fork.yml`。
+镜像已构建并推送到 Docker Hub，**公开仓库、免登录**，`linux/amd64`，YAML 里已填好地址：
 
-1. fork 仓库 → **Settings → Secrets and variables → Actions** 添加两个 Repository secrets：
-   - `DOCKERHUB_USERNAME`：Docker Hub 用户名
-   - `DOCKERHUB_TOKEN`：Docker Hub **Access Token**（Read/Write 权限，不是登录密码）
-2. **Actions** → 选 `Build & Push Docker image (fork)` → **Run workflow**（或推一个 `v*` tag 自动触发）
-3. 产物镜像：`<用户名>/homepage-bookmark-manager:latest`，另有 `:sha-<commit>` 便于回滚
-4. 群晖拉取：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `<用户名>/homepage-bookmark-manager:latest`；或 SSH 里 `docker pull <用户名>/homepage-bookmark-manager:latest`
+| 标签 | 用途 |
+|---|---|
+| `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
+| `boyu233/homepage-bookmark-manager:sha-2b5aefa` | 固定版本，回滚 / 复现用 |
+
+- 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
+- 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
+- 镜像 digest：`sha256:89df55969cee5ef9fdc5acc7f7cdf23acc94657acda9419d2222f68229e34d1b`（两个标签指向同一镜像）。
+
+**以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
 
 > 国内直连 Docker Hub 拉不动时：在 DSM「Container Manager → 设置 → Docker Hub」配置可用的镜像加速，或改用下面的 C 方案导入本地 tar。
 
@@ -114,7 +118,7 @@ Container Manager → **映像 → 导入 → 上传** `homepage.tar`，导入�
 2. **项目名称**填 `homepage`；**路径**选 `/docker/homepage`（或你自己的目录）；**来源**选「**创建 docker-compose.yml**」。
 3. 把 [`synology-compose.yaml`](./synology-compose.yaml) 的**全文粘贴**进编辑框。
    - 这份 YAML **不含 `${}` 变量**，所以不需要、也不要额外上传 `.env`；所有值直接写在 `environment` 里。
-4. 改掉 4 类 `CHANGE_ME` 占位符和 `volumes` 左侧的群晖路径；确认 `NEXTAUTH_URL` 就是浏览器要访问的地址。
+4. 改掉 3 类 `CHANGE_ME` 占位符和 `volumes` 左侧的群晖路径；确认 `NEXTAUTH_URL` 就是浏览器要访问的地址（镜像地址已填好，不用改）。
 5. **下一步 → 完成**（勾选立即启动）。不同 DSM 版本可能多出「Web Station / 门户设置」一步，直接跳过即可。
 6. 到 **容器 → homepage → 日志** 看启动输出；出现 Next.js 的 ready 日志后浏览器访问 `http://群晖IP:3000`。
 

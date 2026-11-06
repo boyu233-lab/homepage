@@ -5,20 +5,21 @@
 # 特点：直接拉取已构建好的镜像，不在 NAS 上编译；所有变量都写在本文件里，
 #       不依赖 .env（Container Manager 粘贴 YAML 时读不到 .env 的 ${} 变量）。
 #
-# ★ 启动前必须改的 4 类占位符（搜索 CHANGE_ME）：
-#   1) image                     -> 你的 Docker Hub 用户名，或本地导入后的镜像名
-#   2) HOMEPAGE_AUTH_PASSWORD   -> 自己生成的强密码
-#   3) NEXTAUTH_SECRET          -> 自己生成的 >=32 位随机值
-#   4) NEXTAUTH_URL / HOMEPAGE_ALLOWED_HOSTS -> 群晖实际访问地址（含端口）
+# ★ 启动前必须改的 3 类占位符（搜索 CHANGE_ME）：
+#   1) HOMEPAGE_AUTH_PASSWORD   -> 自己生成的强密码
+#   2) NEXTAUTH_SECRET          -> 自己生成的 >=32 位随机值
+#   3) NEXTAUTH_URL / HOMEPAGE_ALLOWED_HOSTS -> 群晖实际访问地址（含端口）
 #   另外把 volumes 左侧的 /volume1/docker/homepage/config 改成真实共享文件夹路径。
 #
-# ⚠️ 本文件会提交到 GitHub，只能放占位符；真实口令 / secret 绝不写进来，
+# ⚠️ 本文件会提交到 GitHub，鉴权凭据只能放占位符；真实口令 / secret 绝不写进来，
 #    也不要把填好真实值的版本截图或分享出去。
 # =============================================================================
 
 services:
   homepage:
-    image: CHANGE_ME_DOCKERHUB_USER/homepage-bookmark-manager:latest
+    # 已发布到 Docker Hub 的公开镜像（linux/amd64，免登录拉取）。
+    # 回滚用固定版本标签：boyu233/homepage-bookmark-manager:sha-2b5aefa
+    image: boyu233/homepage-bookmark-manager:latest
     container_name: homepage
     restart: unless-stopped
 
