@@ -13,6 +13,9 @@ process.env.HOMEPAGE_ALLOWED_HOSTS = "*";
 // Avoid NextAuth client-side fetches during unit tests.
 vi.mock("next-auth/react", () => ({
   SessionProvider: ({ children }) => children ?? null,
+  useSession: () => ({ data: null, status: "unauthenticated" }),
+  signIn: () => Promise.resolve(),
+  signOut: () => Promise.resolve(),
 }));
 
 // implement a couple of common formatters mocked in next-i18next

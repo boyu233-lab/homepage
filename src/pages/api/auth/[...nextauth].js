@@ -165,9 +165,16 @@ export const authOptions = {
 const nextAuthHandler = NextAuth(authOptions);
 
 async function handler(req, res) {
-  // Just pass empty session if auth not enabled
-  if (!authEnabled) {
+  // 运行时求值：生产镜像若构建期未带 HOMEPAGE_AUTH_ENABLED=true，
+  // providers 会是空的，此时必须显式报错而不是静默放行匿名请求。
+  if (!isAuthEnabled()) {
     return res.status(200).json({});
+  }
+  if (!authEnabled) {
+    throw new Error(
+      "Homepage auth is enabled at runtime but was disabled when the server bundle was built. " +
+        "Rebuild the image with HOMEPAGE_AUTH_ENABLED=true and the same NEXTAUTH_SECRET / NEXTAUTH_URL.",
+    );
   }
 
   return nextAuthHandler(req, res);

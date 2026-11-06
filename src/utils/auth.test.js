@@ -2,7 +2,15 @@ import { encode } from "next-auth/jwt";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import createMockRes from "test-utils/create-mock-res";
-import { isAllowedHost, secureCookie, withAllowedHost, withAuth, withPageAuth } from "utils/auth";
+import {
+  isAllowedHost,
+  isPublicRead,
+  isPublicReadPath,
+  secureCookie,
+  withAllowedHost,
+  withAuth,
+  withPageAuth,
+} from "utils/auth";
 
 describe("handler authentication", () => {
   const secret = "test-session-secret-at-least-32-characters";
@@ -138,6 +146,78 @@ describe("handler host validation", () => {
     });
     expect(result).toEqual({ notFound: true });
     expect(getProps).not.toHaveBeenCalled();
+  });
+});
+
+describe("whitelisted public reads (fork behaviour)", () => {
+  beforeEach(() => {
+    vi.stubEnv("HOMEPAGE_ALLOWED_HOSTS", "*");
+    vi.stubEnv("HOMEPAGE_PUBLIC_READ_PATHS", "");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    "/api/healthcheck",
+    "/api/bookmarks",
+    "/api/services",
+    "/api/hash",
+    "/api/validate",
+    "/api/widgets",
+    "/api/widgets/resources?type=cpu",
+    "/api/config/custom.css",
+    "/api/config/custom.js",
+  ])("treats %s as public read data", (pathname) => {
+    expect(isPublicReadPath(pathname)).toBe(true);
+  });
+
+  it.each([
+    "/api/config/bookmarks",
+    "/api/services/proxy",
+    "/api/revalidate",
+    "/api/mcp",
+    "/manage",
+    "/",
+  ])("never treats %s as public read data", (pathname) => {
+    expect(isPublicReadPath(pathname)).toBe(false);
+  });
+
+  it("supports extending the whitelist through HOMEPAGE_PUBLIC_READ_PATHS", () => {
+    vi.stubEnv("HOMEPAGE_PUBLIC_READ_PATHS", "/api/custom/readonly, /api/extra/*");
+    expect(isPublicReadPath("/api/custom/readonly")).toBe(true);
+    expect(isPublicReadPath("/api/extra/anything")).toBe(true);
+    expect(isPublicReadPath("/api/config/bookmarks")).toBe(false);
+  });
+
+  it("only considers GET/HEAD on whitelisted paths", () => {
+    expect(isPublicRead({ method: "GET", url: "/api/bookmarks" })).toBe(true);
+    expect(isPublicRead({ method: "HEAD", url: "/api/bookmarks" })).toBe(true);
+    expect(isPublicRead({ method: "POST", url: "/api/bookmarks" })).toBe(false);
+    expect(isPublicRead({ method: "GET", url: "/api/services/proxy" })).toBe(false);
+    expect(isPublicRead({ url: "/api/bookmarks" })).toBe(false);
+    expect(isPublicRead({ method: "GET" })).toBe(false);
+  });
+
+  it("lets whitelisted GETs through without a session, but protects everything else", async () => {
+    vi.stubEnv("HOMEPAGE_AUTH_ENABLED", "true");
+    vi.stubEnv("HOMEPAGE_AUTH_SECRET", "test-session-secret-at-least-32-characters");
+
+    const handler = vi.fn(() => "ok");
+    const publicRes = createMockRes();
+    const req = { method: "GET", url: "/api/bookmarks", headers: { host: "localhost:3000" }, cookies: {} };
+    await withAuth(handler)(req, publicRes);
+    expect(handler).toHaveBeenCalledWith(req, publicRes);
+
+    handler.mockClear();
+    const writeRes = createMockRes();
+    await withAuth(handler)({ ...req, method: "POST" }, writeRes);
+    expect(writeRes.statusCode).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
+
+    handler.mockClear();
+    const adminRes = createMockRes();
+    await withAuth(handler)({ ...req, url: "/api/config/bookmarks" }, adminRes);
+    expect(adminRes.statusCode).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
   });
 });
 

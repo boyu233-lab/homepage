@@ -19,8 +19,10 @@ const { state, fs, yaml, config, Docker, dockerCfg, kubeCfg, kubeApi } = vi.hois
 
   const fs = {
     readFile: vi.fn(async (filePath) => {
-      if (String(filePath).endsWith("/services.yaml")) return "services";
-      if (String(filePath).endsWith("/docker.yaml")) return "docker";
+      // Windows 上 path.join 会产生反斜杠，统一归一化后再判断文件名
+      const normalized = String(filePath).replace(/\\/g, "/");
+      if (normalized.endsWith("/services.yaml")) return "services";
+      if (normalized.endsWith("/docker.yaml")) return "docker";
       return "";
     }),
   };

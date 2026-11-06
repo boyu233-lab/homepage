@@ -1,0 +1,31 @@
+# Homepage 书签管理版 · 本地/群晖 Docker Compose 模板
+# 用法：把 .env.example 复制为 .env，填好变量后 `docker compose up -d --build`
+# 注意：镜像直接复用仓库根目录的官方 Dockerfile（多阶段构建）。
+services:
+  homepage:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: homepage-bookmark-manager:local
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # ---- 鉴权（四个必需变量）----
+      HOMEPAGE_AUTH_ENABLED: "true"
+      HOMEPAGE_AUTH_PASSWORD: ${HOMEPAGE_AUTH_PASSWORD}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      # ---- 访问主机白名单（域名 + 内网 IP，逗号分隔）----
+      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS}
+      # ---- 配置目录：必须可写，否则书签写回会 500 ----
+      HOMEPAGE_CONFIG_DIR: /app/config
+      PORT: "3000"
+      # 可选：追加匿名可读的只读端点，逗号分隔，支持 * 前缀匹配
+      HOMEPAGE_PUBLIC_READ_PATHS: ${HOMEPAGE_PUBLIC_READ_PATHS:-}
+    volumes:
+      # 群晖示例路径，请按实际共享文件夹修改；目录需允许 UID 1000 写入
+      - /volume1/docker/homepage/config:/app/config
+      # 可选：若要用 Docker / 服务状态组件，才放开下面这一行
+      # - /var/run/docker.sock:/var/run/docker.sock:ro

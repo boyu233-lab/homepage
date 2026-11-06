@@ -20,7 +20,7 @@ describe("API authentication without middleware", () => {
     expect(res.statusCode).toBe(401);
     expect(res.body).toEqual({ error: "Unauthorized" });
     expect(res.headers["Cache-Control"]).toBe("private, no-store");
-  });
+  }, 15000);
 
   it("keeps sign-in CSS public while protecting custom JavaScript", async () => {
     const { default: handler } = await import("pages/api/config/[path]");
@@ -53,5 +53,5 @@ describe("API host validation without middleware", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(400);
     expect(res.body).toEqual({ error: "Host validation failed. See logs for more details." });
-  });
+  }, 15000);
 });

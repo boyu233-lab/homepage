@@ -7,8 +7,10 @@ import Tab, { slugifyAndEncode } from "components/tab";
 import Revalidate from "components/toggles/revalidate";
 import Widget from "components/widgets/widget";
 import { useTranslation } from "next-i18next/pages";
+import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import Script from "next/script";
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -19,7 +21,6 @@ import { SettingsContext } from "utils/contexts/settings";
 import { TabContext } from "utils/contexts/tab";
 import { ThemeContext } from "utils/contexts/theme";
 
-import { withPageAuth } from "utils/auth";
 import { getDashboardData } from "utils/config/dashboard";
 import useWindowFocus from "utils/hooks/window-focus";
 import normalizeLanguage from "utils/language";
@@ -43,7 +44,7 @@ const Version = dynamic(() => import("components/version"), {
 
 const rightAlignedWidgets = ["weatherapi", "openweathermap", "weather", "openmeteo", "search", "datetime"];
 
-export const getServerSideProps = withPageAuth(async () => ({ props: await getDashboardData() }));
+export const getServerSideProps = async () => ({ props: await getDashboardData() });
 
 function Index({ initialSettings, fallback }) {
   const windowFocused = useWindowFocus();
@@ -163,6 +164,7 @@ function getAllServices(services) {
 
 function Home({ initialSettings }) {
   const { i18n } = useTranslation();
+  const { data: session } = useSession();
   const { theme, setTheme } = useContext(ThemeContext);
   const { color, setColor } = useContext(ColorContext);
   const { settings, setSettings } = useContext(SettingsContext);
@@ -473,6 +475,16 @@ function Home({ initialSettings }) {
             {!settings.hideVersion && <Version disableUpdateCheck={settings.disableUpdateCheck} />}
           </div>
         </div>
+
+        {/* 仅登录后显示；固定在左下角，避开 custom.js 注入到右下角的在线壁纸工具条 */}
+        {session && (
+          <Link
+            href="/manage"
+            className="fixed bottom-6 left-6 z-[60] px-4 py-2 rounded-full bg-theme-500 text-white text-sm shadow-lg hover:bg-theme-600"
+          >
+            管理书签
+          </Link>
+        )}
       </div>
     </>
   );

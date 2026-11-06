@@ -37,7 +37,8 @@ describe("pages/api/hash", () => {
 
     // Return deterministic contents based on file name.
     readFileSync.mockImplementation((filePath) => {
-      const name = filePath.split("/").pop();
+      // Windows 上 path.join 会用反斜杠，先归一化再取文件名
+      const name = String(filePath).replace(/\\/g, "/").split("/").pop();
       return `content:${name}`;
     });
 

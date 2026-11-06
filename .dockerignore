@@ -23,3 +23,7 @@
 **/values.dev.yaml
 README.md
 config/
+
+# 本地构建缓存残骸，避免把数 GB 无关文件打进构建上下文
+.next_trash*/
+.vitest-tmp-bookmarks/

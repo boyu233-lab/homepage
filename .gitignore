@@ -8,9 +8,11 @@
 
 # testing
 /coverage
+/.vitest-tmp-bookmarks/
 
 # next.js
 /.next/
+/.next_trash*/
 /out/
 
 # production
@@ -32,6 +34,10 @@ yarn-error.log*
 
 # local env files
 .env*.local
+deploy/.env
+
+# 书签写回产生的备份（可能含私有地址，禁止提交）
+bookmarks.yaml*.bak
 
 # vercel
 .vercel
