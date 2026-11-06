@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "preinstall": "npx only-allow pnpm",
+    "postinstall": "node scripts/localize-next-devtools.mjs",
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
