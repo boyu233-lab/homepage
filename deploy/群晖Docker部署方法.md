@@ -95,7 +95,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
 
-> 国内直连 Docker Hub 拉不动时：在 DSM「Container Manager → 设置 → Docker Hub」配置可用的镜像加速，或改用下面的 C 方案导入本地 tar。
+> 国内直连 Docker Hub 拉不动时（典型报错 `dial tcp [2a03:2880:...]`），**先看第 8.1 节**：配置镜像加速后再拉，或改用下面的 C 方案导入本地 tar。镜像加速地址不要写进提交到 GitHub 的 YAML，保持 `YAML` 里的标准镜像名不变。
 
 ### B. 让群晖自己构建
 
@@ -156,6 +156,7 @@ curl -i http://群晖IP:3000/manage
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
+| `homepage Pulling / homepage Error`、`Get "https://registry-1.docker.io/v2/": dial tcp [2a03:2880:...]` | **国内 DNS 污染**，见 8.1 节 | 配置镜像加速（首选）或走 C 方案导入 tar |
 | `manifest unknown` / 拉镜像超时 | Docker Hub 上还没有该镜像，或国内网络不通 | 先跑一次 Actions workflow；或改走 C 方案导入 tar |
 | 打开页面 `400 Host validation failed` | 访问用的 host 不在白名单 | 把域名 / IP（含端口）补进 `HOMEPAGE_ALLOWED_HOSTS`，改完重建项目 |
 | 登录页 `Authentication error / Auth is disabled or misconfigured` | 四个必需 env 缺失或 `NEXTAUTH_SECRET` 不足 32 位 | 对照第 3 节补齐，重建容器 |
@@ -164,6 +165,69 @@ curl -i http://群晖IP:3000/manage
 | 管理页保存报 500 | 配置目录 UID 1000 不可写 | 重做第 4 节 `chown`；看容器日志确认 |
 | 匿名访问 `/api/config/bookmarks` 返回 401 | **这是预期行为**，不是故障 | 登录后才有权限 |
 | ARM 机型启动失败 `exec format error` | 镜像是 amd64 | 自行构建 arm64 镜像 |
+
+### 8.1 拉取镜像报 `dial tcp [2a03:2880:...]`（国内 DNS 污染，最常见）
+
+**现象**：Container Manager 项目日志里 `homepage Pulling` → `homepage Error`，报错
+
+```
+Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a03:2880:f126:8...]: connect: network is unreachable
+```
+
+**原因**：`registry-1.docker.io` 被 DNS 污染。`2a03:2880::/32` 是 Facebook 的地址段，IPv4 也常被解析成 Twitter 段 `104.244.46.x`。群晖优先走 IPv6，而家宽通常没有 IPv6 出口，于是卡在 `dial tcp [IPv6]`。**注意**：群晖官方知识库建议把 DNS 改成 `114.114.114.114 / 223.5.5.5`，但实测这两个 DNS 返回的仍是污染地址；仅关 IPv6 也只是换成被污染的 IPv4，通常仍拉不动。所以要换的是「解析目标」，不是 DNS 本身。
+
+#### 方案 1（推荐）：给 Container Manager 配镜像加速，YAML 不用改
+
+2026-11-06 实测 `https://docker.1panel.live` 可用：返回的目标镜像 digest 与 Docker Hub 上的 `sha256:89df5596…341d1b` 完全一致，manifest 与镜像层 blob 均可正常下载。
+
+1. 开启群晖 SSH，登录后 `sudo -i` 切 root。
+2. **先看原文件，不要覆盖**（DSM 7.2+ 路径；DSM 7.1 及更早的 Docker 套件是 `/var/packages/Docker/etc/dockerd.json`）：
+
+   ```bash
+   cat /var/packages/ContainerManager/etc/dockerd.json
+   ```
+
+   文件里通常已有 `data-root`、`log-driver`、`storage-driver` 等键，**全部保留**，只在其中追加一个 `registry-mirrors` 键（注意 JSON 逗号）：
+
+   ```json
+   {
+     "data-root": "/var/packages/ContainerManager/var/docker",
+     "log-driver": "db",
+     "storage-driver": "btrfs",
+     "registry-mirrors": ["https://docker.1panel.live"]
+   }
+   ```
+
+3. **套件中心 → Container Manager → 停止 → 启动**（不要重启整台 NAS）。图形界面重启最稳妥，也可用 `synosystemctl restart pkgctl-ContainerManager`。
+4. 验证并重新拉：
+
+   ```bash
+   docker info | grep -A 3 "Registry Mirrors"
+   docker pull boyu233/homepage-bookmark-manager:latest
+   docker images --digests | grep homepage-bookmark-manager
+   ```
+
+   确认 digest 是 `sha256:89df55969cee…341d1b` 再回第 6 节重建项目。
+
+> 加速站是第三方服务，随时可能失效。备用源可换成 `https://docker.m.daocloud.io`、`https://docker.1ms.run`（实测 `/v2/` 返回 401 属正常，表示服务在线）；换之前先 `curl -I https://<域名>/v2/` 探一下。
+
+#### 方案 2（不开 SSH）：直接在图形界面拉加速源地址
+
+Container Manager → **映像 → 添加 → 从 URL 添加**，填：
+
+```
+docker.1panel.live/boyu233/homepage-bookmark-manager:latest
+```
+
+拉下来后本地镜像名带前缀，因此要把 `synology-compose.yaml` 的 `image` 改成同一串（或 SSH 里 `docker tag` 成不带前缀的名字）。**这份改动只留在 NAS 上，不要提交回 GitHub**，避免公开仓库硬依赖某个第三方加速站。
+
+#### 方案 3（完全断网也能用）
+
+按第 5 节 C 方案，在能联网的机器上 `docker save` 导出 tar → 上传到 NAS → Container Manager → 映像 → 导入。导入后在「映像」页看实际名称，把 YAML 的 `image` 改成它。
+
+#### 顺带一提
+
+群晖官方知识库还建议：控制面板 → 网络 → 网络介面 → 编辑 → **IPv6 设为关闭**、IPv4 页签**关闭自定义 MTU**、控制面板 → 区域选项 → 时间**与 NTP 同步**。这些能排除 IPv6 路由、MTU、证书时间三类干扰，但**不能解决 DNS 污染**，可作为方案 1 的补充一起做。
 
 ---
 
