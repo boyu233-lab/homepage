@@ -16,6 +16,7 @@ const widgetMappings = {
   kubernetes: dynamic(() => import("components/widgets/kubernetes/kubernetes")),
   stocks: dynamic(() => import("components/widgets/stocks/stocks")),
   customapi: dynamic(() => import("components/widgets/customapi/customapi")),
+  news: dynamic(() => import("components/widgets/news/news")),
 };
 
 export default function Widget({ widget, style }) {

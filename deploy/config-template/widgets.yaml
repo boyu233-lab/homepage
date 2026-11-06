@@ -1,5 +1,10 @@
-# Homepage - 顶部信息组件
-# 保留原有 CPU、内存、根目录磁盘和 DuckDuckGo 搜索
+# Homepage - 顶部信息部件（脱敏默认配置）
+# 1) 搜索框：provider 写成数组即可在输入框右侧下拉切换引擎，选择会记在浏览器里。
+#    可选值：baidu / bing / google / duckduckgo / brave / custom；第一个是默认引擎。
+#    如需输入联想词，加 showSearchSuggestions: true（会把关键词发到对应引擎，注意隐私）。
+# 2) datetime：中文日期时间，format 用 Intl.DateTimeFormat 选项。
+# 3) news：实时新闻，由服务端代理拉取 RSS，浏览器不会直连新闻源。
+#    换新闻源：给容器加环境变量 HOMEPAGE_NEWS_FEEDS=源1,源2（RSS/Atom 地址）。
 
 - resources:
     cpu: true
@@ -7,5 +12,23 @@
     disk: /
 
 - search:
-    provider: duckduckgo
+    provider:
+      - baidu
+      - bing
+      - google
+      - duckduckgo
+      - brave
     target: _blank
+    focus: false
+
+- datetime:
+    text_size: lg
+    locale: zh-CN
+    format:
+      dateStyle: full
+      timeStyle: medium
+
+- news:
+    label: 实时新闻
+    limit: 8
+    refreshInterval: 300000

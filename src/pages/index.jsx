@@ -42,7 +42,7 @@ const Version = dynamic(() => import("components/version"), {
   ssr: false,
 });
 
-const rightAlignedWidgets = ["weatherapi", "openweathermap", "weather", "openmeteo", "search", "datetime"];
+const rightAlignedWidgets = ["weatherapi", "openweathermap", "weather", "openmeteo", "search", "datetime", "news"];
 
 export const getServerSideProps = async () => ({ props: await getDashboardData() });
 
