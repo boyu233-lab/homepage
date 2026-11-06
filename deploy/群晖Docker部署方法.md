@@ -58,7 +58,52 @@ openssl rand -base64 24     # -> HOMEPAGE_AUTH_PASSWORD
 | `NEXTAUTH_SECRET` | 上一步生成的随机值 |
 | `NEXTAUTH_URL` | **浏览器地址栏里的完整地址**，例如 `http://192.168.1.100:3000` 或 `https://nav.example.com` |
 
-`NEXTAUTH_URL` 必须与实际访问地址一致：`http` 还是 `https`、带不带端口都要对。写成 `https` 时会话 cookie 会启用 Secure 属性，走纯 HTTP 访问会登录不上。若通过反向代理用域名访问，同时把域名和内网 IP 都写进 `HOMEPAGE_ALLOWED_HOSTS`。
+`NEXTAUTH_URL` 必须与实际访问地址一致：`http` 还是 `https`、带不带端口都要对。写成 `https` 时会话 cookie 会启用 Secure 属性，走纯 HTTP 访问会登录不上。若通过反向代理用域名访问，同时把域名和内网 IP 都写进 `HOMEPAGE_ALLOWED_HOSTS`（详见 3.1）。
+
+### 3.1 外网访问：两个 host 变量各管一件事
+
+| 变量 | 管什么 | 填错的表现 |
+|---|---|---|
+| `HOMEPAGE_ALLOWED_HOSTS` | 进门的 **Host 白名单**（`src/proxy.js` 与 `src/utils/auth.js` 都会校验请求头 `Host`） | `400 {"error":"Host validation failed. See logs for more details."}` |
+| `NEXTAUTH_URL` | NextAuth 的**对外基址**：登录后跳回哪里、cookie 是否 Secure 都由它决定（相对 `callbackUrl=/manage` 会被拼成 `NEXTAUTH_URL 的 origin + /manage`） | 登录成功却被送回 `http://192.168.1.100:3000`，或反复跳回登录页 |
+
+`NEXTAUTH_URL` 里的 host 会被**自动信任**，不必再写进白名单；`HOMEPAGE_ALLOWED_HOSTS` 主要用来补「其它入口」和「反向代理改写后的 Host」。白名单的格式是 `域名[:端口]`，**不带 `http://`、不带路径、不带空格**，多个用英文逗号分隔，且必须与请求头里的 host 精确一致（含端口、大小写）。
+
+**场景 A：外网 DDNS 域名 + 群晖反向代理 + HTTPS（推荐）**
+
+```yaml
+environment:
+  NEXTAUTH_URL: "https://nav.example.com"
+  HOMEPAGE_ALLOWED_HOSTS: "nav.example.com,nav.example.com:443,192.168.1.100:3000"
+```
+
+群晖 `控制面板 → 应用程序门户 → 反向代理`，目标填 `http://localhost:3000`，并在「自定义标头」里加：
+
+- `X-Forwarded-Proto` = `https`
+- `X-Forwarded-Host` = `nav.example.com`
+
+`Host` 头要透传原始域名（nginx 对应 `$http_host`）。若群晖把它改写成了内网 IP，容器日志会打印实际收到值，见下方排查法。
+
+**场景 B：直接把 3000 端口映射到公网 / DDNS + 端口**
+
+```yaml
+environment:
+  NEXTAUTH_URL: "http://nav.example.com:3000"
+  HOMEPAGE_ALLOWED_HOSTS: "nav.example.com:3000,192.168.1.100:3000"
+```
+
+**拿到 100% 准确的 Host**：被拒绝时容器日志会打印实际值，把冒号后面那串原样粘进白名单即可。
+
+```bash
+docker logs homepage 2>&1 | grep "Host validation failed"
+# Host validation failed for: nav.example.com:3000
+```
+
+**协议必须唯一**：`secureCookie()` 依据 `NEXTAUTH_URL` 的协议决定 cookie 名（https → `__Secure-next-auth.session-token`，http → `next-auth.session-token`）。因此「外网 https 域名 + 内网 `http://IP:3000`」两边登录态不互通，且登录后一律回 `NEXTAUTH_URL` 那个地址。最省事的做法是**内外网都用同一个域名**（在路由器 / 本地 DNS 上把该域名解析到群晖内网 IP，或开启 NAT 回环），只保留一份地址、一份 cookie。
+
+排错时可把 `HOMEPAGE_ALLOWED_HOSTS` 临时设为 `*` 全放行（源码支持），确认通了再收紧，不要在公网长期使用。
+
+**改完必须重建容器**：Docker 的环境变量在容器创建时固定，`restart` 不会重新读取。Container Manager 里要「停止 → 清除 → 重新构建」，或 SSH 里 `docker compose up -d --force-recreate`；随后清掉浏览器该站点的 cookie（或用无痕窗口）再登录，并全程只用同一个地址。
 
 ---
 
@@ -195,7 +240,8 @@ curl -i http://群晖IP:3000/manage
 | `homepage Pulling / homepage Error`、`Get "https://registry-1.docker.io/v2/": dial tcp [2a03:2880:...]` | **国内 DNS 污染**，见 8.1 节 | 配置镜像加速（首选）或走 C 方案导入 tar |
 | 容器反复重启，日志 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory` | **旧镜像**的入口脚本是 CRLF（`#!/bin/sh\r`，Linux 找不到解释器），多见于 Windows 上 `core.autocrlf=true` 时构建 | **重新拉取已修复的镜像**（删掉本地旧镜像后重建项目）；仓库已加 `.gitattributes` + Dockerfile 内 `tr -d '\r'` 双重防护。若必须用旧镜像，见下方覆盖写法 |
 | `manifest unknown` / 拉镜像超时 | Docker Hub 上还没有该镜像，或国内网络不通 | 先跑一次 Actions workflow；或改走 C 方案导入 tar |
-| 打开页面 `400 Host validation failed` | 访问用的 host 不在白名单 | 把域名 / IP（含端口）补进 `HOMEPAGE_ALLOWED_HOSTS`，改完重建项目 |
+| 打开页面 `400 Host validation failed` | 访问用的 host 不在白名单 | 把域名 / IP（含端口）补进 `HOMEPAGE_ALLOWED_HOSTS`，改完重建容器；**反代 + 外网配置见 3.1** |
+| 登录 `/manage` 成功后被送到 `http://192.168.1.100:3000`（局域网地址） | `NEXTAUTH_URL` 还写着内网地址；它是 NextAuth 的回调基址，相对 `callbackUrl` 会被拼回这个 origin | 把 `NEXTAUTH_URL` 改成外网**完整**地址（含协议 / 域名 / 端口），重建容器、清 cookie；内外网尽量统一用同一域名，见 3.1 |
 | 登录页 `Authentication error / Auth is disabled or misconfigured` | 四个必需 env 缺失或 `NEXTAUTH_SECRET` 不足 32 位 | 对照第 3 节补齐，重建容器 |
 | 登录成功但首页没有「管理书签」 | 浏览器里混用了 `localhost` / IP / 域名，会话 cookie 不互通 | 全程固定用同一个地址；清掉该站点的 cookie 重新登录 |
 | 反代后反复跳回登录页 | `NEXTAUTH_URL` 写成 `http`，实际访问是 `https`（或反之） | 改成与实际协议一致，并在反代里正确传 `X-Forwarded-Proto` |
