@@ -59,6 +59,8 @@ export default defineConfig([
       "import/order": "off",
     },
   },
+  // Chrome 扩展是独立的 Manifest V3 项目（自带 chrome.* 全局与最新语法），
+  // 不参与 Next.js 构建，也不应受本项目 ESLint 的 ecmaVersion/import 规则约束。
   globalIgnores([
     "./config/",
     "./coverage/",
@@ -66,5 +68,6 @@ export default defineConfig([
     "./.next/",
     "./.next_trash*/",
     "./site/",
+    "./extension/",
   ]),
 ]);

@@ -1,0 +1,116 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f4f7fc;
+  --card: #fff;
+  --border: rgba(15, 23, 42, 0.1);
+  --text: #0f172a;
+  --sub: #5b677c;
+  --accent: #6366f1;
+  --accent-2: #06b6d4;
+  --ghost: rgba(15, 23, 42, 0.06);
+  --ghost-hover: rgba(15, 23, 42, 0.11);
+  --code: rgba(99, 102, 241, 0.1);
+  --ok: #059669;
+  --err: #dc2626;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1120;
+    --card: #131c30;
+    --border: rgba(148, 163, 184, 0.16);
+    --text: #eaf0ff;
+    --sub: #9aa9c2;
+    --accent: #818cf8;
+    --accent-2: #22d3ee;
+    --ghost: rgba(148, 163, 184, 0.12);
+    --ghost-hover: rgba(148, 163, 184, 0.2);
+    --code: rgba(129, 140, 248, 0.16);
+    --ok: #34d399;
+    --err: #f87171;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+body.popup { width: 330px; }
+body.options { min-height: 100vh; display: grid; place-items: start center; padding: 40px 20px; }
+
+.sheet {
+  width: 100%;
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+body.options .sheet {
+  max-width: 720px;
+  padding: 32px 36px 36px;
+  border-radius: 22px;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
+}
+
+.head { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.head strong { display: block; font-size: 15px; }
+.head small { display: block; margin-top: 2px; font-size: 12px; color: var(--sub); }
+.logo {
+  display: grid; place-items: center; flex: none;
+  width: 36px; height: 36px; border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; font-size: 19px; font-weight: 800;
+}
+
+.status {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 16px; padding: 10px 12px;
+  border-radius: 10px; background: var(--ghost);
+  font-size: 13px; color: var(--sub); word-break: break-all;
+}
+.dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--sub); }
+.dot.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
+
+button {
+  padding: 10px 16px; border: 1px solid transparent; border-radius: 10px;
+  font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+button:active { transform: translateY(1px); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.ghost { background: var(--ghost); color: var(--text); }
+.ghost:hover { background: var(--ghost-hover); }
+.wide { display: block; width: 100%; margin-bottom: 12px; }
+
+.switch { display: flex; align-items: center; gap: 10px; margin: 14px 0; font-size: 14px; cursor: pointer; }
+.switch input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+body.popup .switch { margin: 16px 0; padding: 4px 2px; }
+.note { margin: -6px 0 18px 27px; font-size: 12px; line-height: 1.6; color: var(--sub); }
+
+.field { display: block; margin-bottom: 22px; }
+.field > span { display: block; margin-bottom: 8px; font-weight: 600; }
+.field em { margin-left: 6px; font-style: normal; font-size: 11px; color: var(--err); }
+.field input {
+  width: 100%; padding: 11px 13px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg); color: var(--text);
+  font-size: 14px; font-family: inherit;
+}
+.field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.field small { display: block; margin-top: 7px; font-size: 12px; line-height: 1.6; color: var(--sub); }
+
+.row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.message { min-height: 20px; margin: 14px 0 0; font-size: 13px; color: var(--ok); }
+.message[data-ok="false"] { color: var(--err); }
+
+.tips { margin-top: 34px; padding-top: 24px; border-top: 1px solid var(--border); }
+.tips h2 { margin: 0 0 12px; font-size: 15px; }
+.tips ul { margin: 0; padding-left: 20px; color: var(--sub); line-height: 1.85; font-size: 13px; }
+.tips li { margin-bottom: 6px; }
+code {
+  padding: 2px 6px; border-radius: 6px;
+  background: var(--code); color: var(--accent);
+  font-size: 12px; word-break: break-all;
+}
+
+.foot { margin: 16px 0 0; font-size: 11px; text-align: center; color: var(--sub); }

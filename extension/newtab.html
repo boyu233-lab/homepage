@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Homepage</title>
+    <link rel="stylesheet" href="newtab.css" />
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true"></div>
+
+    <main class="card">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">H</span>
+        <span>Homepage 新标签页</span>
+      </div>
+
+      <section data-panel="loading">
+        <h1>正在准备…</h1>
+      </section>
+
+      <section data-panel="redirecting" hidden>
+        <h1>正在打开导航页</h1>
+        <p class="sub">即将前往 <code id="target-host"></code></p>
+        <div class="progress"><span id="progress-bar"></span></div>
+        <div class="actions">
+          <button id="open-now" class="primary" type="button">立即打开</button>
+          <button id="stay" class="ghost" type="button">留在此页</button>
+          <button id="settings" class="ghost" type="button">设置</button>
+        </div>
+        <p class="hint" id="shift-hint">打开后按住 Shift 可停留在此页</p>
+      </section>
+
+      <section data-panel="paused" hidden>
+        <h1>已停留</h1>
+        <p class="sub">自动跳转已暂停，可以慢慢改设置。</p>
+        <div class="actions">
+          <button id="resume" class="primary" type="button">继续打开</button>
+          <button id="settings-paused" class="ghost" type="button">设置</button>
+        </div>
+      </section>
+
+      <section data-panel="setup" hidden>
+        <h1>先填一下 Homepage 地址</h1>
+        <p class="sub">首次使用需要告诉扩展你的导航页在哪。地址只保存在本机，不会同步或上传。</p>
+        <form id="setup-form" class="setup-form">
+          <input
+            id="url-input"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://nav.example.com 或 192.168.1.100:3000"
+            aria-label="Homepage 地址"
+          />
+          <button class="primary" type="submit">保存并打开</button>
+        </form>
+        <p id="setup-error" class="error" hidden>地址无效，请填写 http(s) 开头的完整地址或 域名:端口。</p>
+        <div class="actions">
+          <button id="settings-setup" class="ghost" type="button">完整设置</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="newtab.js"></script>
+  </body>
+</html>

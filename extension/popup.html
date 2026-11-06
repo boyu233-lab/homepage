@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Homepage 新标签页</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body class="popup">
+    <main class="sheet">
+      <header class="head">
+        <span class="logo" aria-hidden="true">H</span>
+        <div>
+          <strong>Homepage 新标签页</strong>
+          <small>新建标签页 · 启动浏览器</small>
+        </div>
+      </header>
+
+      <div class="status">
+        <span class="dot" id="status-dot" aria-hidden="true"></span>
+        <span id="status-text">正在读取配置…</span>
+      </div>
+
+      <button id="open" class="primary wide" type="button">打开 Homepage</button>
+
+      <label class="switch">
+        <input id="open-on-startup" type="checkbox" />
+        <span>启动浏览器时自动打开</span>
+      </label>
+
+      <button id="options" class="ghost wide" type="button">完整设置 →</button>
+
+      <p class="foot">地址仅保存在本机，不会同步到云端</p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

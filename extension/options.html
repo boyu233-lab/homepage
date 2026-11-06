@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Homepage 新标签页 · 设置</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body class="options">
+    <main class="sheet">
+      <header class="head">
+        <span class="logo" aria-hidden="true">H</span>
+        <div>
+          <strong>Homepage 新标签页 · 设置</strong>
+          <small>Manifest V3 · 只申请 storage 权限</small>
+        </div>
+      </header>
+
+      <form id="form">
+        <label class="field">
+          <span>Homepage 地址 <em>必填</em></span>
+          <input
+            id="homepage-url"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://nav.example.com 或 192.168.1.100:3000"
+          />
+          <small>填浏览器地址栏里那个完整地址。只写域名时可省略 http://，默认按 http 处理。</small>
+        </label>
+
+        <label class="field">
+          <span>新标签页跳转延迟（毫秒）</span>
+          <input id="redirect-delay" type="number" min="0" max="3000" step="100" />
+          <small>0 = 立即跳转。留一点延迟才有时间按 Shift 停留在本页。</small>
+        </label>
+
+        <label class="switch">
+          <input id="open-on-startup" type="checkbox" />
+          <span>启动浏览器时自动打开 Homepage</span>
+        </label>
+        <p class="note">Chrome 启动时若已经通过新标签页打开了 Homepage，扩展不会重复开标签。</p>
+
+        <label class="switch">
+          <input id="pause-with-shift" type="checkbox" />
+          <span>允许按住 Shift 暂停跳转</span>
+        </label>
+        <p class="note">想改设置又不想被立刻跳走时，新建标签页后按住 Shift 即可停留。</p>
+
+        <div class="row">
+          <button class="primary" type="submit">保存设置</button>
+          <button id="test" class="ghost" type="button">测试打开</button>
+          <button id="startup-settings" class="ghost" type="button">Chrome 启动设置</button>
+        </div>
+        <p id="message" class="message" aria-live="polite"></p>
+      </form>
+
+      <section class="tips">
+        <h2>使用提示</h2>
+        <ul>
+          <li>新建标签页会被自动替换为 Homepage；点击扩展图标也能随时打开。</li>
+          <li>Chrome「设置 → 启动时」选「打开新标签页」即可天然生效；选「继续上次会话」时由扩展在启动后自动补开一个 Homepage 标签。</li>
+          <li>如果页面报 <code>Host validation failed</code>，把这里的域名（含端口）加进服务端的 <code>HOMEPAGE_ALLOWED_HOSTS</code>，并确认 <code>NEXTAUTH_URL</code> 与访问地址一致。</li>
+          <li>本扩展与其它新标签页扩展（WeTab、Infinity 等）会冲突，请只启用一个。</li>
+          <li>采用整页跳转而不是 iframe 内嵌：自托管站点常有 X-Frame-Options / CSP 限制，内嵌会被拦、登录 Cookie 也容易失效。</li>
+          <li>配置存于 <code>chrome.storage.local</code>，不申请 <code>tabs</code> / 网络 / 遥测权限，不含任何预置的私有地址。</li>
+        </ul>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
