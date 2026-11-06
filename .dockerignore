@@ -16,7 +16,6 @@
 **/compose*
 **/Dockerfile*
 **/node_modules
-!.next/standalone/node_modules
 **/npm-debug.log
 **/obj
 **/secrets.dev.yaml
@@ -24,7 +23,10 @@
 README.md
 config/
 
-# 本地构建缓存残骸，避免把数 GB 无关文件打进构建上下文
+# 本地构建缓存残骸，避免把数 GB 无关文件打进构建上下文。
+# .next 由 builder 阶段在 Linux 容器内重新生成；本仓库 workflow 明确不传 CI=true，
+# 因此不需要把宿主机（可能是 Windows）的 standalone 产物塞进 context。
+.next/
 .next_trash*/
 .vitest-tmp-bookmarks/
 

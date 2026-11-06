@@ -12,7 +12,12 @@ ARG CI
 ARG BUILDTIME
 ARG VERSION
 ARG REVISION
+# 国内构建时可传 --build-arg PNPM_REGISTRY=https://registry.npmmirror.com，
+# corepack 下载 pnpm 与 pnpm install 都走该镜像；默认仍是官方 npmjs（CI 无影响）。
+ARG PNPM_REGISTRY=https://registry.npmjs.org
 ENV CI=$CI
+ENV COREPACK_NPM_REGISTRY=$PNPM_REGISTRY
+ENV npm_config_registry=$PNPM_REGISTRY
 
 # Install and build only outside CI
 RUN if [ "$CI" != "true" ]; then \

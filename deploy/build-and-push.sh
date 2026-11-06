@@ -10,6 +10,8 @@
 # 用法：
 #   DOCKERHUB_IMAGE=你的用户名/homepage-bookmark-manager ./deploy/build-and-push.sh
 #   IMAGE_TAG=2026.11.05 ./deploy/build-and-push.sh
+#   国内网络构建失败（corepack 拉不到 pnpm）时加：
+#   PNPM_REGISTRY=https://registry.npmmirror.com DOCKERHUB_IMAGE=... ./deploy/build-and-push.sh
 #
 # 更省事的做法：用 .github/workflows/docker-publish-fork.yml 在云端构建，无需本机 Docker。
 
@@ -43,6 +45,11 @@ BUILD_ARGS=(
   --build-arg "VERSION=${TAG}"
   --build-arg "REVISION=${SHA}"
 )
+
+if [ -n "${PNPM_REGISTRY:-}" ]; then
+  BUILD_ARGS+=(--build-arg "PNPM_REGISTRY=${PNPM_REGISTRY}")
+  echo "npm 镜像源: ${PNPM_REGISTRY}"
+fi
 
 # 容器内如需走代理，把宿主机代理变量透传（注意 127.0.0.1 在容器内指向容器本身）
 for var in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
