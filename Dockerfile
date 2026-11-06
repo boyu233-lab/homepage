@@ -43,7 +43,12 @@ WORKDIR /app
 
 # Copy some files from context
 COPY --link --chown=1000:1000 /public ./public/
-COPY --link --chmod=755 docker-entrypoint.sh /usr/local/bin/
+# 始终在 Linux 侧剥掉 CR：Windows 检出（core.autocrlf=true）会把 .sh 变成
+# CRLF，shebang 变成 #!/bin/sh\r 会导致容器启动时 exec 报 "no such file or directory"。
+COPY --link docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN tr -d '\r' < /usr/local/bin/docker-entrypoint.sh > /tmp/entrypoint.sh \
+ && mv /tmp/entrypoint.sh /usr/local/bin/docker-entrypoint.sh \
+ && chmod 755 /usr/local/bin/docker-entrypoint.sh
 
 # Copy only necessary files from the build stage
 COPY --link --from=builder --chown=1000:1000 /app/.next/standalone/ ./

@@ -1,0 +1,6 @@
+# shell 脚本与 Dockerfile 必须保持 LF：
+# Windows 上 core.autocrlf=true 会把它们转成 CRLF，COPY 进 Linux 镜像后
+# shebang 变成 #!/bin/sh\r，容器启动报 "no such file or directory"。
+*.sh text eol=lf
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf

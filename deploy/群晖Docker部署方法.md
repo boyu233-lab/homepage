@@ -157,6 +157,7 @@ curl -i http://群晖IP:3000/manage
 | 现象 | 原因 | 处理 |
 |---|---|---|
 | `homepage Pulling / homepage Error`、`Get "https://registry-1.docker.io/v2/": dial tcp [2a03:2880:...]` | **国内 DNS 污染**，见 8.1 节 | 配置镜像加速（首选）或走 C 方案导入 tar |
+| 容器反复重启，日志 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory` | **旧镜像**的入口脚本是 CRLF（`#!/bin/sh\r`，Linux 找不到解释器），多见于 Windows 上 `core.autocrlf=true` 时构建 | **重新拉取已修复的镜像**（删掉本地旧镜像后重建项目）；仓库已加 `.gitattributes` + Dockerfile 内 `tr -d '\r'` 双重防护。若必须用旧镜像，见下方覆盖写法 |
 | `manifest unknown` / 拉镜像超时 | Docker Hub 上还没有该镜像，或国内网络不通 | 先跑一次 Actions workflow；或改走 C 方案导入 tar |
 | 打开页面 `400 Host validation failed` | 访问用的 host 不在白名单 | 把域名 / IP（含端口）补进 `HOMEPAGE_ALLOWED_HOSTS`，改完重建项目 |
 | 登录页 `Authentication error / Auth is disabled or misconfigured` | 四个必需 env 缺失或 `NEXTAUTH_SECRET` 不足 32 位 | 对照第 3 节补齐，重建容器 |
@@ -165,6 +166,15 @@ curl -i http://群晖IP:3000/manage
 | 管理页保存报 500 | 配置目录 UID 1000 不可写 | 重做第 4 节 `chown`；看容器日志确认 |
 | 匿名访问 `/api/config/bookmarks` 返回 401 | **这是预期行为**，不是故障 | 登录后才有权限 |
 | ARM 机型启动失败 `exec format error` | 镜像是 amd64 | 自行构建 arm64 镜像 |
+
+> **旧镜像临时绕过**（只在无法重新拉取时用）：在 compose 的 `homepage` 服务下加下面两行，启动时先把 `\r` 去掉再执行入口脚本，CMD 保持原样。
+>
+> ```yaml
+> entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /usr/local/bin/docker-entrypoint.sh > /tmp/e.sh && chmod 755 /tmp/e.sh && exec /tmp/e.sh \"$@\"", "--"]
+> command: ["node", "server.js"]
+> ```
+>
+> 根本办法还是换镜像：删掉 NAS 上的旧镜像 → 项目「清除并重建」，拉到新 digest。
 
 ### 8.1 拉取镜像报 `dial tcp [2a03:2880:...]`（国内 DNS 污染，最常见）
 
