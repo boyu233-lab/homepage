@@ -1,0 +1,387 @@
+/*
+ * Homepage - Aurora Tiles(Heimdall 瓷砖 × 暗紫极光 融合风格)
+ * 紫色主题底 + 纯 CSS 几何图案背景(不依赖图片挂载/重启)
+ * + 暗色玻璃瓷砖 + 圆形图标盘 + 右侧箭头 + "//" 分组标题 + 彩色高亮瓷砖
+ *
+ * 注意:本站的分组都在 bookmarks.yaml 里,所以卡片主体是 .bookmark > a;
+ * 下面所有规则都同时覆盖 .service-card(服务)和 .bookmark > a(书签)。
+ */
+
+/* ============ 基础 ============ */
+html,
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============ 背景:紫色极光 + 几何图案(纯 CSS,直接盖在主题紫色底上) ============ */
+/* 无需挂载 background.svg,无需重启容器,刷新即生效。
+   图案浓淡:改各层 rgba 的透明度;点阵密度:改 34px;斜线间距:改 46px */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(58% 58% at 72% 16%, rgba(139, 92, 246, 0.30), transparent 70%),
+    radial-gradient(50% 50% at 50% 56%, rgba(217, 70, 239, 0.14), transparent 70%),
+    radial-gradient(55% 55% at 12% 86%, rgba(76, 29, 149, 0.35), transparent 70%),
+    radial-gradient(circle at 2px 2px, rgba(216, 204, 255, 0.16) 1.3px, transparent 1.5px),
+    repeating-linear-gradient(45deg, rgba(167, 139, 250, 0.07) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(-45deg, rgba(167, 139, 250, 0.05) 0 1px, transparent 1px 46px);
+  background-size: auto, auto, auto, 34px 34px, auto, auto;
+}
+
+/* ============ 背景切换:在线 Bing 每日高清壁纸(按钮由 custom.js 生成) ============ */
+/* 图片地址由 JS 写入 --bing-url;只叠极薄一层暗色,保证壁纸通透清晰(可读性由卡片实底兜底) */
+body.bing-bg::before {
+  background-image:
+    linear-gradient(rgba(14, 7, 25, 0.12), rgba(14, 7, 25, 0.12)),
+    var(--bing-url, none) !important;
+  background-size: auto, cover !important;
+  background-position: center, center !important;
+  background-repeat: no-repeat !important;
+}
+
+/* 壁纸模式下去掉覆盖层(瓷砖/按钮)的毛玻璃,让高清壁纸清晰透出 */
+body.bing-bg .service-card,
+body.bing-bg .bookmark > a,
+body.bing-bg .bg-switch-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* 同时让壁纸模式下卡片背景更实一点,避免复杂壁纸透出后文字看不清 */
+body.bing-bg .service-card,
+body.bing-bg .bookmark > a {
+  background: rgba(28, 22, 55, 0.7) !important;
+}
+
+.bg-switch {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 50;
+  display: flex;
+  gap: 6px;
+}
+
+.bg-switch-btn {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(28, 22, 55, 0.72);
+  color: #efeaff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.bg-switch-btn:hover {
+  background: rgba(124, 58, 237, 0.55);
+  border-color: rgba(196, 181, 253, 0.8);
+}
+
+.bg-switch-mini {
+  padding: 7px 10px;
+}
+
+/* ============ 瓷砖长度:整体布局不变,只把每块瓷砖缩短一截(右侧留白) ============ */
+/* 想更短把 86% 调小(如 78%),想恢复满宽把本规则删除 */
+.service-card,
+.bookmark > a {
+  width: 55% !important;
+}
+.bookmark > a {
+  height: 120% !important;
+}
+/* ============ 卡片:暗色玻璃瓷砖(服务 + 书签) ============ */
+.service-card,
+.bookmark > a {
+  background: rgba(28, 22, 55, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28) !important;
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    filter 160ms ease !important;
+}
+
+.service-card:hover,
+.bookmark > a:hover {
+  transform: translateY(-2px);
+  border-color: rgba(167, 139, 250, 0.45) !important;
+  filter: brightness(1.15);
+}
+
+/* 卡片文字:名称亮白,描述淡紫 */
+.service-card .service-name,
+.bookmark .bookmark-name {
+  color: #efeaff !important;
+  font-weight: 600;
+}
+
+.bookmark .bookmark-name {
+  font-size: 0.8rem;
+}
+
+.service-card .service-description,
+.bookmark .bookmark-description {
+  color: rgba(214, 204, 255, 0.55) !important;
+}
+
+/* ============ 圆形图标盘 ============ */
+.service-card .service-icon {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 2px 4px 2px 2px;
+}
+
+.bookmark > a > .flex {
+  align-items: center;
+}
+
+.bookmark .bookmark-icon {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px;
+  flex-shrink: 0;
+  border-radius: 50% !important;
+  margin: 4px 8px 4px 6px;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #d8ccff !important;
+}
+
+/* ============ 右侧跳转箭头(Heimdall 标志性元素) ============ */
+.service-card .service-title::after,
+.bookmark .bookmark-text::after {
+  content: "\2192"; /* → */
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0 10px 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  line-height: 1;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.service-card:hover .service-title::after,
+.bookmark > a:hover .bookmark-text::after {
+  background: rgba(167, 139, 250, 0.3);
+  color: #ffffff;
+}
+
+/* ============ 彩色高亮瓷砖预设(可选,Heimdall 元素) ============ */
+/* 用法:在 bookmarks.yaml 里给书签加 id: tile-xxx;同一颜色可用于多个书签 */
+#tile-green .service-card,  #tile-green > a  { background: rgba(46, 160, 67, 0.85) !important; }
+#tile-orange .service-card, #tile-orange > a { background: rgba(230, 126, 34, 0.85) !important; }
+#tile-blue .service-card,   #tile-blue > a   { background: rgba(56, 103, 214, 0.85) !important; }
+#tile-purple .service-card, #tile-purple > a { background: rgba(136, 84, 208, 0.85) !important; }
+#tile-pink .service-card,   #tile-pink > a   { background: rgba(219, 39, 119, 0.85) !important; }
+#tile-red .service-card,    #tile-red > a    { background: rgba(192, 57, 43, 0.85) !important; }
+#tile-teal .service-card,   #tile-teal > a   { background: rgba(13, 148, 136, 0.85) !important; }
+
+/* 白色瓷砖(文字、图标盘、箭头需反色) */
+#tile-white .service-card, #tile-white > a { background: rgba(245, 246, 250, 0.94) !important; }
+#tile-white .service-name, #tile-white .bookmark-name { color: #22223a !important; }
+#tile-white .service-description, #tile-white .bookmark-description { color: #55556e !important; }
+#tile-white .service-icon, #tile-white .bookmark-icon { background: rgba(0, 0, 0, 0.06) !important; }
+#tile-white .service-title::after, #tile-white .bookmark-text::after {
+  background: rgba(0, 0, 0, 0.08);
+  color: #33334d;
+}
+
+/* ============ 分组标题:"//" 前缀(分组图标在 settings.yaml 的 layout 里配) ============ */
+.services-group h2,
+.bookmark-group h2 {
+  color: #dcd4ff !important;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.services-group h2::before,
+.bookmark-group h2::before {
+  content: "//";
+  color: #a78bfa;
+  margin-right: 5px;
+}
+
+/* ============ 搜索框 ============ */
+input[type="search"],
+input[placeholder*="Search"],
+input[placeholder*="搜索"] {
+  background: rgba(28, 22, 55, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px;
+  color: #efeaff !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+input[type="search"]:focus,
+input[placeholder*="Search"]:focus,
+input[placeholder*="搜索"]:focus {
+  border-color: rgba(167, 139, 250, 0.6) !important;
+}
+
+/* ============ 左侧分组导航(配合 custom.js) ============ */
+/* 分组容器改为横向排列:左导航 + 右内容 */
+.nav-layout {
+  flex-wrap: nowrap !important;
+  align-items: flex-start;
+  gap: 22px;
+}
+
+/* 左侧竖排导航列
+   注意:不要用 sticky 的 top 来"下移"标题 —— top 会受分组高度/是否可滚动影响,
+   切换书签多的分组时标题会往下跳。想下移请统一改 margin-top(固定值)。 */
+.group-nav {
+  flex: 0 0 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: sticky;
+  top: 14px;            /* 仅用于滚动时贴顶,不要调大 */
+  margin-top: 0;        /* 四个标题整体下移量,调这里;对所有分组恒定 */
+  align-self: flex-start;
+  z-index: 20;
+}
+
+.group-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(28, 22, 55, 0.4);
+  color: #cfc6f5;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.group-nav-item:hover {
+  background: rgba(58, 44, 100, 0.6);
+  color: #ffffff;
+}
+
+.group-nav-item.active {
+  background: rgba(124, 58, 237, 0.38);
+  border-color: rgba(167, 139, 250, 0.5);
+  color: #ffffff;
+}
+
+.group-nav-item .bookmark-group-icon,
+.group-nav-item .services-group-icon {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.group-nav-name::before {
+  content: "//";
+  color: #a78bfa;
+  margin-right: 5px;
+}
+
+/* 导航模式下隐藏各分组的原始标题按钮 */
+.nav-layout > .bookmark-group > button,
+.nav-layout > .services-group > button {
+  display: none !important;
+}
+
+/* 只显示激活的分组 */
+.nav-layout > .bookmark-group,
+.nav-layout > .services-group {
+  display: none !important;
+}
+
+.nav-layout > .bookmark-group.nav-active,
+.nav-layout > .services-group.nav-active {
+  display: block !important;
+  flex: 1 1 auto;
+  max-width: none;
+  padding-bottom: 24px; /* 底部留白,保证最后一行能完整滚到视野内 */
+}
+
+/* 修复最后一行被裁:分组面板自带 overflow-hidden + 折叠动画写入的固定 px 高度,
+   改成网格后内容变高会超出旧高度。强制这三层高度自适应并取消裁切。 */
+.nav-layout > .bookmark-group.nav-active,
+.nav-layout > .services-group.nav-active,
+.nav-layout > .bookmark-group.nav-active > div,
+.nav-layout > .services-group.nav-active > div,
+.nav-layout > .bookmark-group.nav-active > div > div,
+.nav-layout > .services-group.nav-active > div > div {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* 激活分组内的瓷砖改为网格平铺
+   - grid-template-columns 控制【每行几列 / 瓷砖长度】,不要用它调间距
+   - gap 的第一个值 = 上下间距(行距),第二个值 = 左右间距(列距) */
+.nav-layout .bookmark-group ul,
+.nav-layout .services-group ul {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px 10px;
+}
+
+.nav-layout .bookmark-group ul > li,
+.nav-layout .services-group ul > li {
+  margin: 0 !important;
+}
+
+.nav-layout .bookmark > a,
+.nav-layout .service-card {
+  width: 100% !important;
+}
+
+/* 窄屏:导航收为顶部横向滚动条 */
+@media (max-width: 860px) {
+  .nav-layout {
+    flex-wrap: wrap !important;
+  }
+  .group-nav {
+    flex: 1 1 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    position: static;
+  }
+  .group-nav-item {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+/* ============ 减少动态效果偏好 ============ */
+@media (prefers-reduced-motion: reduce) {
+  .service-card,
+  .bookmark > a,
+  input[type="search"],
+  input[placeholder*="Search"],
+  input[placeholder*="搜索"] {
+    transition: none !important;
+  }
+
+  .service-card:hover,
+  .bookmark > a:hover {
+    transform: none !important;
+  }
+}

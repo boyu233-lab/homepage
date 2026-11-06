@@ -127,6 +127,39 @@ Container Manager → **映像 → 导入 → 上传** `homepage.tar`，导入�
 
 ---
 
+## 6.1 首次部署必须上传定制配置（否则页面是「官方原版外观」）
+
+镜像只包含**代码**。本 fork 的在线壁纸按钮、左侧分组导航、极光瓷砖样式、深色紫色主题，全部由配置目录下的 `custom.js` / `custom.css` / `settings.yaml` 提供，而镜像内 `src/skeleton/` 里这些文件是**空的或官方默认值**。
+
+挂载目录缺文件时，Homepage 会按官方逻辑从 skeleton 自动拷贝，页面就变成官方默认外观：`My First/Second/Third Group` 三个演示服务、顶部 CPU/内存/磁盘信息条、纯色背景，没有在线壁纸按钮。**这经常被误判成「拉错镜像 / 镜像是 fork 前的原版」，实际镜像没坏，不用重拉。**
+
+把 [`deploy/config-template/`](./config-template/) 里的 5 个文件上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径）：
+
+| 文件 | 作用 |
+|---|---|
+| `custom.js` | 左侧分组导航 + 右下角「在线壁纸」「换一张」 |
+| `custom.css` | 极光背景、瓷砖卡片样式 |
+| `settings.yaml` | 深色紫色主题、快捷搜索、关闭原生折叠 |
+| `widgets.yaml` | 顶部 CPU / 内存 / 磁盘 / 搜索组件 |
+| `services.yaml` | 空列表，清掉官方三个演示服务 |
+
+⚠️ **不要覆盖 `bookmarks.yaml`**，那里面是自己的真实书签，模板刻意不包含它。上传后 `chown -R 1000:1000` 保证可写，然后**重建项目 + Ctrl+F5**（custom.js / custom.css 有缓存，只刷新不生效）。
+
+判断镜像是否为本 fork（在 NAS SSH 里）：
+
+```bash
+curl -i http://127.0.0.1:3030/manage | head -5
+```
+
+| 结果 | 结论 |
+|---|---|
+| `307` → `/auth/signin?...` | 镜像正确，只是缺配置，按上表补齐 |
+| `404` | 拉到了官方 `gethomepage/homepage` 镜像；检查 compose 的 `image`，删掉 NAS 上旧镜像再重建 |
+
+「管理书签」按钮属于镜像代码，但**仅登录后可见**：访问 `http://<NAS-IP>:3030/manage` 输入 `HOMEPAGE_AUTH_PASSWORD`，回到首页后**左下角**才出现该按钮。未登录时首页不显示任何管理入口，这是设计如此，不是功能缺失。
+
+---
+
 ## 7. 启动后验收（逐条实测）
 
 | # | 场景 | 期望结果 |
