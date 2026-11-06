@@ -1,6 +1,11 @@
-# 定制配置模板（首次部署必传）
+# 定制配置模板（镜像已内置，本包为可选参考）
 
-## 为什么需要
+> ⚠️ **状态更新**：自提交 `413f3e8` 起，这套配置已**脱敏后内置进镜像**的 `src/skeleton/`。
+> 全新部署会自动获得定制外观；旧部署由入口脚本自动补齐空文件 / 官方默认文件，且不会覆盖用户自己的配置。
+> **正常情况下不再需要手动上传本包**。本目录现用于：手动覆盖、自定义壁纸源 / 分组图标、排查时对照。
+> 升级做法：删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5。
+
+## 历史背景：为什么以前需要
 
 镜像里只包含**代码**。本 fork 的可见定制（在线壁纸按钮、左侧分组导航、极光瓷砖样式、深色紫色主题）全部由配置目录下的 `custom.js` / `custom.css` / `settings.yaml` 提供，而镜像内 `src/skeleton/` 里这三个文件是**空的或官方默认值**。
 
@@ -8,9 +13,9 @@
 
 「管理书签」按钮属于镜像代码，但设计上**仅登录后可见**；未登录时首页故意不放任何管理入口。
 
-## 上传清单
+## 手动覆盖清单（可选）
 
-把本目录这 5 个文件上传到 NAS 的配置目录（compose 里 `volumes` 冒号**右侧**对应的宿主机路径，例如 `/volume1/docker/homepage1/config/`）：
+只有想改壁纸源、分组图标等才需要上传。目标目录是 compose `volumes` 冒号**左侧**的宿主机路径，例如 `/volume1/docker/homepage1/config/`：
 
 | 文件 | 作用 |
 |---|---|
@@ -24,9 +29,9 @@
 
 上传后确保目录属主可写：`sudo chown -R 1000:1000 /volume1/docker/homepage1/config`。
 
-## 生效步骤
+## 手动覆盖时的生效步骤
 
-1. 上传 5 个文件。
+1. 只上传要改的那几个文件（**别覆盖 `bookmarks.yaml`**）。注意入口脚本不会覆盖已修改的非空文件，所以手动改完会一直生效。
 2. Container Manager → 项目 → 停止 → **清除缓存并重建**（或 SSH 里 `docker compose down && docker compose up -d`）。custom.js / custom.css 有缓存，只刷新浏览器可能不生效。
 3. 浏览器 **Ctrl+F5** 强制刷新。
 4. 页面应出现：左侧竖排分组导航、右下角「在线壁纸」/「换一张」、暗紫极光背景；官方演示服务消失。
@@ -39,7 +44,7 @@
 curl -i http://127.0.0.1:3030/manage | head -5
 ```
 
-- `307` 跳转到 `/auth/signin?...` → **镜像正确**，只是缺配置，按上面补齐即可。
+- `307` 跳转到 `/auth/signin?...` → **镜像正确**。若页面仍是官方原版外观，说明拉到的是旧镜像：删掉 NAS 上旧镜像 → 重拉 → 重建，新镜像会自动补齐配置。
 - `404` → 拉到的是官方 `gethomepage/homepage` 镜像。检查 compose 的 `image` 是否为
   `docker.1ms.run/boyu233/homepage-bookmark-manager:latest`，并先删掉 NAS 上的旧镜像再重建。
 
@@ -52,6 +57,6 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ## 可选调整
 
-- **分组图标**：`settings.yaml` 的 `layout` 里把「示例分组」改成你 `bookmarks.yaml` 里的真实分组名，图标用 `mdi-xxx` / `si-xxx`。不写也能正常显示。
+- **分组图标**：`settings.yaml` 末尾有注释掉的 `layout` 示例，取消注释并把「你的分组名」改成 `bookmarks.yaml` 里的真实分组名，图标用 `mdi-xxx` / `si-xxx`。不写也能正常显示。
 - **壁纸自托管**：`custom.js` 顶部 `WALLPAPER_TODAY` / `WALLPAPER_RANDOM` 换成自己 NAS/Nginx 上的图片 URL；两组都写成 `[]` 可彻底关闭第三方图片请求，页面保持极光背景。
 - **关闭左侧导航**：清空 `custom.js` 即可（壁纸按钮会一起消失）。

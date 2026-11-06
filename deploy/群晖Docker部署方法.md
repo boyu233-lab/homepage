@@ -87,11 +87,11 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 | 标签 | 用途 |
 |---|---|
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
-| `boyu233/homepage-bookmark-manager:sha-95b63a7` | 当前固定版本（已修复 Windows CRLF 启动失败），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-413f3e8` | 当前固定版本（**已内置脱敏定制配置**，见 6.1 节），回滚 / 复现用 |
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`sha256:6a82cfd90492ff260ee6ee222f84282eddd0dba4434eb9e8b1a04da1cb0d01ce`（`latest` 与 `sha-95b63a7` 指向同一镜像）。
+- 当前镜像 digest：`sha256:d327c0f584b42a3147ef4e9e67b9992f564d6bc67dd8257eb43154425bc31a63`（`latest` 与 `sha-413f3e8` 指向同一镜像）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
@@ -127,23 +127,25 @@ Container Manager → **映像 → 导入 → 上传** `homepage.tar`，导入�
 
 ---
 
-## 6.1 首次部署必须上传定制配置（否则页面是「官方原版外观」）
+## 6.1 定制配置已内置进镜像（自提交 `413f3e8` 起）
 
-镜像只包含**代码**。本 fork 的在线壁纸按钮、左侧分组导航、极光瓷砖样式、深色紫色主题，全部由配置目录下的 `custom.js` / `custom.css` / `settings.yaml` 提供，而镜像内 `src/skeleton/` 里这些文件是**空的或官方默认值**。
+早期镜像只包含**代码**：在线壁纸按钮、左侧分组导航、极光瓷砖样式、深色紫色主题全在配置目录的 `custom.js` / `custom.css` / `settings.yaml` 里，而镜像内 `src/skeleton/` 是**空的官方默认**。首次部署时 Homepage 自动从 skeleton 拷贝，页面就变成「官方原版外观」（三个 `My First/Second/Third Group` 演示服务、纯色背景、无在线壁纸），常被误判成「拉错镜像」。
 
-挂载目录缺文件时，Homepage 会按官方逻辑从 skeleton 自动拷贝，页面就变成官方默认外观：`My First/Second/Third Group` 三个演示服务、顶部 CPU/内存/磁盘信息条、纯色背景，没有在线壁纸按钮。**这经常被误判成「拉错镜像 / 镜像是 fork 前的原版」，实际镜像没坏，不用重拉。**
+**现在已修好**：镜像内 `src/skeleton/` 换成了**已脱敏**的定制配置（Dockerfile 显式 COPY 覆盖 standalone 自带版本），入口脚本在启动时自动补齐旧部署遗留的默认文件。
 
-把 [`deploy/config-template/`](./config-template/) 里的 5 个文件上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径）：
-
-| 文件 | 作用 |
+| 场景 | 行为 |
 |---|---|
-| `custom.js` | 左侧分组导航 + 右下角「在线壁纸」「换一张」 |
-| `custom.css` | 极光背景、瓷砖卡片样式 |
-| `settings.yaml` | 深色紫色主题、快捷搜索、关闭原生折叠 |
-| `widgets.yaml` | 顶部 CPU / 内存 / 磁盘 / 搜索组件 |
-| `services.yaml` | 空列表，清掉官方三个演示服务 |
+| 全新部署（配置目录为空） | 应用自动从镜像内 skeleton 拷贝完整定制配置，开箱即有壁纸 / 导航 / 极光主题 |
+| 旧部署（已有 0 字节 `custom.js` / `custom.css`，或官方默认 yaml） | 入口脚本只在「文件不存在 / 为空 / 与官方原版逐字节一致」时替换为内置定制版，日志打印 `Applied bundled default: xxx` |
+| 用户自己改过的非空配置 | **一律不动**，包括自己的 `bookmarks.yaml` |
 
-⚠️ **不要覆盖 `bookmarks.yaml`**，那里面是自己的真实书签，模板刻意不包含它。上传后 `chown -R 1000:1000` 保证可写，然后**重建项目 + Ctrl+F5**（custom.js / custom.css 有缓存，只刷新不生效）。
+识别「官方原版」用的指纹存放在镜像 `/app/skeleton-official/`（仓库 `deploy/skeleton-official/`，即上游原版 skeleton）。内置书签是**脱敏演示版**（搜索引擎 / 社区与开发，仅百度、Google、GitHub 等公开地址），不含任何私有地址、标签或凭据。
+
+> 升级步骤：**删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5**，不用再手动上传任何配置文件。若重建后仍是官方外观，看容器日志有没有 `Applied bundled default:` —— 没有就说明拉到的还是旧镜像。
+>
+> custom.js / custom.css 有浏览器缓存，**Ctrl+F5 必须做**。
+
+[`deploy/config-template/`](./config-template/) 保留作手动覆盖与自定义参考（改壁纸源、分组图标等），不再是必需步骤；模板刻意不含 `bookmarks.yaml`，避免覆盖自己的真实书签。
 
 判断镜像是否为本 fork（在 NAS SSH 里）：
 
@@ -225,7 +227,7 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
 
 #### 方案 1（长期最干净）：给 Container Manager 配镜像加速，YAML 不用改
 
-2026-11-06 实测 **`https://docker.1ms.run` 可用**：`docker pull` 成功拿到 `sha256:6a82cfd9…d01ce`，拉下来的镜像入口脚本是 LF、能正常启动；`https://hub.rat.dev` 同样可用。推送新镜像后加速源会及时同步。
+2026-11-06 实测 **`https://docker.1ms.run` 可用**：`docker pull` 成功，拉下来的镜像入口脚本是 LF、能正常启动，且内置定制配置齐全；`https://hub.rat.dev` 同样可用。推送新镜像后加速源会及时同步（当前 digest 以第 5 节 A 为准）。
 
 ⚠️ **不要用 `docker.1panel.live` 配 `registry-mirrors` 或加镜像前缀**：它用 `curl` 查 manifest 正常，但 Docker 实际拉取会对 HEAD 请求返回 `403 Forbidden`。`docker.m.daocloud.io` 有镜像白名单，会直接拒绝 `boyu233/homepage-bookmark-manager`（`this image is not in the allowlist`）。**判断加速源能否用，必须以 `docker pull` 实测为准，不能只看 curl 状态码。**
 
@@ -256,7 +258,7 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
    docker images --digests | grep homepage-bookmark-manager
    ```
 
-   确认 digest 是 `sha256:6a82cfd90492…d01ce` 再回第 6 节重建项目。
+   确认 digest 是 `sha256:d327c0f584b4…c31a63`（见第 5 节 A）再回第 6 节重建项目。
 
 > 加速站是第三方服务，随时可能失效。备用源 `https://hub.rat.dev`（同样实测 `docker pull` 成功）。`/v2/` 返回 401 是正常的鉴权挑战，不代表不可用；**换源前用 `docker pull <源域名>/boyu233/homepage-bookmark-manager:latest` 实测一次**再改配置。
 
