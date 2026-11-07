@@ -234,26 +234,34 @@ input[placeholder*="搜索"]:focus {
 }
 
 /* ============ 左侧分组导航(配合 custom.js) ============ */
-/* 分组容器改为横向排列:左导航 + 右内容 */
+/* 分组容器改为横向排列:左导航 + 右内容。
+   导航已绝对定位(见下),这里用 padding-left 保留它原来的占位,
+   避免分组瓷砖跑到最左侧与导航重叠。 */
 .nav-layout {
   flex-wrap: nowrap !important;
   align-items: flex-start;
   gap: 22px;
-  min-height: 62vh;     /* 给左侧标题列提供垂直居中的空间 */
+  min-height: 0;          /* 不再靠撑高容器来居中,位置由 top 固定 */
+  padding-left: 190px;    /* = 导航宽度,脱离文档流后的占位 */
 }
 
-/* 左侧竖排导航列(所有屏宽都保持从上到下,不改成横排)
-   上下居中:由 .nav-layout 的 min-height + align-self:center + margin:auto 0 实现,
-   不依赖 sticky 的 top(会受分组高度/滚动影响,切换分组时标题会跳)。 */
+/* 左侧竖排导航列:固定停在第一版面的同一位置。
+   - position:absolute 相对页面主容器(#inner_wrapper > div,自带 relative),
+     top 只与视口高度有关,与新闻条数、分组高度、当前选中项都无关:
+     点「首页」/「搜索引擎」/「社区与开发」或刷新页面,导航都不会上下移动。
+   - 不是悬浮层:滚动页面时它随内容一起走,不会一直贴在屏幕上。
+   - 想微调高度:改下面的 36vh(占视口高度的比例);想改左右:改 left。 */
 .group-nav {
-  flex: 0 0 190px;
+  position: absolute;
+  top: clamp(180px, 36vh, 380px);
+  left: 32px;             /* 对齐 #layout-groups 的 sm:m-8 左边距 */
+  width: 190px;
+  margin: 0;
+  align-self: auto;
   display: flex;
   flex-direction: column !important;  /* 恒定竖排,窄屏与官方响应式规则都不覆盖 */
   gap: 6px;
-  position: static;                   /* 不用 sticky:滚动贴顶会破坏上下居中 */
-  margin: auto 0;                     /* flex 内上下 auto 边距,居中双保险 */
-  align-self: center;                 /* 左侧标题整体上下居中 */
-  z-index: 20;
+  z-index: 30;
 }
 
 .group-nav-item {
@@ -358,14 +366,17 @@ input[placeholder*="搜索"]:focus {
   .nav-layout {
     flex-wrap: nowrap !important;
     gap: 12px;
-    min-height: 62vh;      /* 保留上下居中空间,不要设 0 */
+    min-height: 0;
+    padding-left: 140px;
   }
   .group-nav {
-    flex: 0 0 140px;
+    top: clamp(160px, 34vh, 320px);
+    left: 16px;
+    width: 140px;
     flex-direction: column !important;
     overflow: visible;
-    align-self: center;
-    margin: auto 0;
+    margin: 0;
+    align-self: auto;
   }
   .group-nav-item {
     width: 100%;
@@ -385,12 +396,22 @@ input[placeholder*="搜索"]:focus {
   .nav-layout {
     flex-wrap: wrap !important;
     min-height: 0;
+    padding-left: 0;
+    padding-top: 60px;     /* 给顶部导航条让位,避免与分组内容重叠 */
   }
   .group-nav {
-    flex: 1 1 100%;
-    flex-direction: column !important;
-    align-self: flex-start;
-    margin: 0 0 14px;
+    position: absolute;
+    top: 82px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    margin: 0;
+    align-self: auto;
+  }
+  .group-nav-item {
+    width: auto;
   }
 }
 
