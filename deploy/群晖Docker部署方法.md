@@ -127,11 +127,11 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ### A. 直接拉取已发布镜像（推荐，当前可用）
 
-> ✅ **2026-11-07 11:05 更新完成**：含「多引擎搜索 / 中文时间 / **首页常驻新闻列表 + 来源筛选**」的新版镜像已推送 Docker Hub，`:latest` 与 `:sha-4d61e9b` 两个标签均经 Registry API 核验。
-> 当前 digest：`sha256:58b2c52c4498a79c8cc40111f4120a5ba4a9df10f1c827776933587ab00d1ec2`（377MB，`linux/amd64`）。
-> - **升级已有部署**：删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目，并按 **6.2 节**覆盖 `widgets.yaml` **和 `custom.css`**（入口脚本不会覆盖你已有的配置文件）。
+> ✅ **2026-11-07 11:58 更新完成**：在「多引擎搜索 / 中文时间 / 首页常驻新闻列表 + 来源筛选」基础上，镜像内置的 `custom.css` 已更新为**左侧导航固定位置**（切换分组不跳动，见 6.3 节）。`:latest` 与 `:sha-2b2a4c3` 两个标签已推送 Docker Hub。
+> 当前 digest：`sha256:0c58819d5d01b4a0e3a9b7e56fa4c6d43b1b143120d90e0c6e4ad528f8cff16a`（`linux/amd64`）。
+> - **升级已有部署**：① 用 `homepage-nav-fix.zip` 覆盖配置目录里的 `custom.css`（**必做**，见 6.3 节；入口脚本不会覆盖你改过的配置文件）；② 需要一并更新镜像时，删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目。若还没做 6.2 节的三部件升级，也按 **6.2 节**覆盖 `widgets.yaml` 与 `custom.js`。
 > - 容器内实测 `/api/widgets/news?index=3` 返回 `feedNames: ["百度新闻","新浪国内","IT之家"]` 与 24 条新闻；**没有 `feedNames` 或返回 404 = 仍是旧镜像**。
-> - 离线兜底：`homepage-image-20261107.tar`（81MB，含本次改动）按 **C 方案**导入。`homepage-image-20261106.tar` 是上一版（轮播 + 下拉窗口），不要用于本次升级。
+> - 离线兜底：`homepage-image-20261107.tar`（80MB，**已重新导出为 11:58 版**，含导航固定位置）按 **C 方案**导入；NAS 上若有同名旧文件，先删再传。`homepage-image-20261106.tar` 是更旧的一版（轮播 + 下拉窗口），不要用。
 > - 国内加速源可能仍缓存上一版，拉完请按 **8.1 节**核对 digest；不一致就等同步或改用 tar 导入。
 
 镜像已构建并推送到 Docker Hub，**公开仓库、免登录**，`linux/amd64`，YAML 里已填好地址：
@@ -139,12 +139,13 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 | 标签 | 用途 |
 |---|---|
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
-| `boyu233/homepage-bookmark-manager:sha-4d61e9b` | 当前固定版本（**常驻新闻列表 + 来源筛选 + 内置脱敏定制配置**，见 6.1 / 6.2 节），回滚 / 复现用 |
-| `boyu233/homepage-bookmark-manager:sha-cfea038` | 上一版（轮播一条 + 点击展开下拉窗口），需要回退时用 |
+| `boyu233/homepage-bookmark-manager:sha-2b2a4c3` | 当前固定版本（**导航固定位置 + 常驻新闻列表 + 来源筛选 + 内置脱敏定制配置**，见 6.1 / 6.2 / 6.3 节），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-4d61e9b` | 上一版（常驻新闻列表，但导航仍会随内容跳动），需要回退时用 |
+| `boyu233/homepage-bookmark-manager:sha-cfea038` | 更早一版（轮播一条 + 点击展开下拉窗口） |
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`sha256:58b2c52c4498a79c8cc40111f4120a5ba4a9df10f1c827776933587ab00d1ec2`（`latest` 与 `sha-4d61e9b` 指向同一镜像）。
+- 当前镜像 digest：`sha256:0c58819d5d01b4a0e3a9b7e56fa4c6d43b1b143120d90e0c6e4ad528f8cff16a`（`latest` 与 `sha-2b2a4c3` 指向同一镜像）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
@@ -194,7 +195,7 @@ Container Manager → **映像 → 导入 → 上传** `homepage.tar`，导入�
 
 识别「官方原版」用的指纹存放在镜像 `/app/skeleton-official/`（仓库 `deploy/skeleton-official/`，即上游原版 skeleton）。内置书签是**脱敏演示版**（搜索引擎 / 社区与开发，仅百度、Google、GitHub 等公开地址），不含任何私有地址、标签或凭据。
 
-> 升级步骤：**删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5**，不用再手动上传任何配置文件。若重建后仍是官方外观，看容器日志有没有 `Applied bundled default:` —— 没有就说明拉到的还是旧镜像。
+> 升级步骤：**删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5**；**全新部署**不用手动上传配置文件，但**已有部署**因为配置文件已存在，需要按 6.2 / 6.3 节覆盖 `custom.css` 等文件才能拿到新排版。若重建后仍是官方外观，看容器日志有没有 `Applied bundled default:` —— 没有就说明拉到的还是旧镜像。
 >
 > custom.js / custom.css 有浏览器缓存，**Ctrl+F5 必须做**。
 
@@ -227,8 +228,8 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ### 已有部署的升级步骤（必做）
 
-1. 更新镜像（**常驻列表与来源筛选是新增组件代码，不换镜像不会出现**）：删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest`（新 digest `sha256:58b2c52c…1ec2`）→ 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时用 `homepage-image-20261107.tar` 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
-2. 把新的 `widgets.yaml` **和 `custom.css`** 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml`**。可直接用随本次更新提供的 `homepage-layout-update.zip`（含 3 个定制文件 + 说明）。
+1. 更新镜像（**常驻列表与来源筛选是新增组件代码，不换镜像不会出现**）：删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest`（当前 digest `sha256:0c58819d…f16a`）→ 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时用 `homepage-image-20261107.tar` 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
+2. 把新的 `widgets.yaml`、`custom.js` **和 `custom.css`** 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml`**。可用 `homepage-layout-update.zip`（三件套）后，再用 `homepage-nav-fix.zip` 覆盖一次 `custom.css`（导航固定位置，最新版）。
 3. Container Manager → 项目 → 停止 → 清除并重建（或 SSH `docker compose down && docker compose up -d`）。
 4. 浏览器 **Ctrl+F5** 强制刷新。
 
@@ -257,6 +258,27 @@ curl -i http://127.0.0.1:3030/manage | head -5
 - **条数与刷新**：`news.limit`（默认 8，最多 30，直接决定首页铺开几行）、`news.refreshInterval`（毫秒，默认 300000）。
 
 > 排错：新闻一直停在「正在获取新闻…」→ 先在 NAS 上 `docker exec homepage wget -qO- 'https://news.baidu.com/n?cmd=1&class=civilnews&tn=rss' | head -c 200` 确认容器能出网；再确认拉的是新版镜像、`widgets.yaml` 里有 `- news:`。若页面仍是「轮播一条 + 点击展开的小窗口」，说明**还是旧镜像或浏览器缓存**：先 Ctrl+F5 / 无痕窗口，再核对镜像 digest。
+
+---
+
+## 6.3 左侧导航固定位置（2026-11-07）
+
+**问题**：旧版 `custom.css` 用 `margin: auto 0` 让导航在 flex 容器里自动居中。首页视图被「大字时间 + 8 条新闻」撑高后，导航会沉到页面左下角；点其他分组又跳回上方，位置随内容和当前分组变。
+
+**现在**：`.group-nav` 改为绝对定位（`top: clamp(180px, 36vh, 380px)`、`left: 32px`，相对页面主容器），`.nav-layout` 用 `padding-left` 保留原来的占位。导航距顶部的距离只与视口高度有关，与新闻条数、分组高度、当前选中项都无关：
+
+- 点「首页」/「搜索引擎」/「社区与开发」、刷新页面，导航都在同一高度，不会上下跳动；
+- 滚动页面时它随内容一起走，不是一直贴在屏幕上的悬浮层；
+- 窄屏（≤860px）列宽收窄到 140px，手机（≤560px）改为顶部横排标签条。
+
+**已有部署升级**：本次只改 `custom.css`（`custom.js` 未变），覆盖配置文件即可生效；镜像内 `src/skeleton/custom.css` 也已同步，全新部署开箱即带新位置。
+
+1. 把 `homepage-nav-fix.zip` 里的 `custom.css` 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml` / `widgets.yaml` / `custom.js`**。
+2. 浏览器 **Ctrl+F5** 强制刷新（`custom.css` 有浏览器缓存）；容器不用重启。
+3. 自检：停在「首页」（大字时间 + 新闻）记住左侧导航高度 → 点「搜索引擎」→ 高度完全一致即成功。
+4. 微调：改 `custom.css` 里 `.group-nav` 的 `top`（数值越大越靠下）和 `left`；窄屏在文件末尾两个 `@media` 里改。
+
+> 若同时要升级镜像：先删旧镜像重拉 `latest`（见 5-A），再执行上面 1-2 步。入口脚本**不会覆盖你改过的配置文件**，只换镜像、不覆盖 `custom.css` 的话，导航仍是旧位置。
 
 ---
 
