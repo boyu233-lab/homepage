@@ -127,23 +127,24 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ### A. 直接拉取已发布镜像（推荐，当前可用）
 
-> ✅ **2026-11-07 更新完成**：含「多引擎搜索 / 中文时间 / 实时新闻」的新版镜像已推送到 Docker Hub，`:latest` 与 `:sha-cfea038` 两个标签均已核验。
-> 当前 digest：`sha256:4a78326d80932a326070c652e3d8889530bf7956e5663495cef3fd17500f3198`（377MB，`linux/amd64`）。
-> - 已实测 `docker.1ms.run` / `hub.rat.dev` 两个国内加速源的 `latest` 清单与新 digest 一致，可用加速域名拉取。
-> - **升级已有部署**：删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目，并按 **6.2 节**再上传一次 `widgets.yaml`（入口脚本不会覆盖你已有的配置文件）。
-> - 离线兜底：`homepage-image-20261106.tar`（81MB，`docker load` 实测通过）仍可按 **C 方案**导入，效果相同。
-> - 容器内实测 `/api/widgets/news?index=3` 返回 20 条；若返回 404，说明跑的仍是旧镜像。
+> ✅ **2026-11-07 11:05 更新完成**：含「多引擎搜索 / 中文时间 / **首页常驻新闻列表 + 来源筛选**」的新版镜像已推送 Docker Hub，`:latest` 与 `:sha-4d61e9b` 两个标签均经 Registry API 核验。
+> 当前 digest：`sha256:58b2c52c4498a79c8cc40111f4120a5ba4a9df10f1c827776933587ab00d1ec2`（377MB，`linux/amd64`）。
+> - **升级已有部署**：删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目，并按 **6.2 节**覆盖 `widgets.yaml` **和 `custom.css`**（入口脚本不会覆盖你已有的配置文件）。
+> - 容器内实测 `/api/widgets/news?index=3` 返回 `feedNames: ["百度新闻","新浪国内","IT之家"]` 与 24 条新闻；**没有 `feedNames` 或返回 404 = 仍是旧镜像**。
+> - 离线兜底：`homepage-image-20261107.tar`（81MB，含本次改动）按 **C 方案**导入。`homepage-image-20261106.tar` 是上一版（轮播 + 下拉窗口），不要用于本次升级。
+> - 国内加速源可能仍缓存上一版，拉完请按 **8.1 节**核对 digest；不一致就等同步或改用 tar 导入。
 
 镜像已构建并推送到 Docker Hub，**公开仓库、免登录**，`linux/amd64`，YAML 里已填好地址：
 
 | 标签 | 用途 |
 |---|---|
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
-| `boyu233/homepage-bookmark-manager:sha-cfea038` | 当前固定版本（**含三部件 + 内置脱敏定制配置**，见 6.1 节），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-4d61e9b` | 当前固定版本（**常驻新闻列表 + 来源筛选 + 内置脱敏定制配置**，见 6.1 / 6.2 节），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-cfea038` | 上一版（轮播一条 + 点击展开下拉窗口），需要回退时用 |
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`sha256:4a78326d80932a326070c652e3d8889530bf7956e5663495cef3fd17500f3198`（`latest` 与 `sha-cfea038` 指向同一镜像）。
+- 当前镜像 digest：`sha256:58b2c52c4498a79c8cc40111f4120a5ba4a9df10f1c827776933587ab00d1ec2`（`latest` 与 `sha-4d61e9b` 指向同一镜像）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
@@ -226,7 +227,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ### 已有部署的升级步骤（必做）
 
-1. 更新镜像（**常驻列表与来源筛选是新增组件代码，不换镜像不会出现**）：删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest` → 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时可用导出的 tar 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
+1. 更新镜像（**常驻列表与来源筛选是新增组件代码，不换镜像不会出现**）：删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest`（新 digest `sha256:58b2c52c…1ec2`）→ 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时用 `homepage-image-20261107.tar` 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
 2. 把新的 `widgets.yaml` **和 `custom.css`** 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml`**。可直接用随本次更新提供的 `homepage-layout-update.zip`（含 3 个定制文件 + 说明）。
 3. Container Manager → 项目 → 停止 → 清除并重建（或 SSH `docker compose down && docker compose up -d`）。
 4. 浏览器 **Ctrl+F5** 强制刷新。
@@ -356,7 +357,7 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
    docker images --digests | grep homepage-bookmark-manager
    ```
 
-   确认 digest 是 `sha256:4a78326d8093…f3198`（见第 5 节 A）再回第 6 节重建项目。
+   确认 digest 是 `sha256:58b2c52c4498…1ec2`（见第 5 节 A）再回第 6 节重建项目。若仍是 `4a78326d…`，说明加速源还在缓存上一版，等同步或改用 5-C 的 tar 导入。
 
 > 加速站是第三方服务，随时可能失效。备用源 `https://hub.rat.dev`（同样实测 `docker pull` 成功）。`/v2/` 返回 401 是正常的鉴权挑战，不代表不可用；**换源前用 `docker pull <源域名>/boyu233/homepage-bookmark-manager:latest` 实测一次**再改配置。
 
