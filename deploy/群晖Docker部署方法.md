@@ -127,24 +127,23 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ### A. 直接拉取已发布镜像（推荐，当前可用）
 
-> ⚠️ **2026-11-06 本次「多引擎搜索 / 时间 / 实时新闻」更新的镜像状态**
-> 新镜像已在本机构建完成并通过容器内实测（`/api/widgets/news` 返回 20 条），但**尚未推送到 Docker Hub**：本机到 `registry-1.docker.io` 直连超时、代理不可用。
-> 因此**此刻从 Hub 拉 `:latest` 拿到的仍是旧镜像** `sha256:d327c0f5…`，不含新闻部件。
-> - 新镜像本地 digest：`sha256:4a78326d80932a326070c652e3d8889530bf7956e5663495cef3fd17500f3198`，本地标签 `:latest` / `:sha-cfea038`（377MB）。
-> - **立即可用**：已导出 `homepage-image-20261106.tar`（OCI 格式 84MB，`docker load` 实测通过），按下面 **C 方案**导入 NAS。
-> - 网络恢复后重推 Hub：执行 `NO_BUILD_PROXY=1 PNPM_REGISTRY=https://registry.npmmirror.com DOCKERHUB_IMAGE=boyu233/homepage-bookmark-manager ./deploy/build-and-push.sh`，随后群晖删旧镜像重拉 `latest`。
-> - 三个部件的升级步骤见 **6.2 节**（除镜像外还要上传一次 `widgets.yaml`）。
+> ✅ **2026-11-07 更新完成**：含「多引擎搜索 / 中文时间 / 实时新闻」的新版镜像已推送到 Docker Hub，`:latest` 与 `:sha-cfea038` 两个标签均已核验。
+> 当前 digest：`sha256:4a78326d80932a326070c652e3d8889530bf7956e5663495cef3fd17500f3198`（377MB，`linux/amd64`）。
+> - 已实测 `docker.1ms.run` / `hub.rat.dev` 两个国内加速源的 `latest` 清单与新 digest 一致，可用加速域名拉取。
+> - **升级已有部署**：删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目，并按 **6.2 节**再上传一次 `widgets.yaml`（入口脚本不会覆盖你已有的配置文件）。
+> - 离线兜底：`homepage-image-20261106.tar`（81MB，`docker load` 实测通过）仍可按 **C 方案**导入，效果相同。
+> - 容器内实测 `/api/widgets/news?index=3` 返回 20 条；若返回 404，说明跑的仍是旧镜像。
 
 镜像已构建并推送到 Docker Hub，**公开仓库、免登录**，`linux/amd64`，YAML 里已填好地址：
 
 | 标签 | 用途 |
 |---|---|
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
-| `boyu233/homepage-bookmark-manager:sha-413f3e8` | 当前固定版本（**已内置脱敏定制配置**，见 6.1 节），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-cfea038` | 当前固定版本（**含三部件 + 内置脱敏定制配置**，见 6.1 节），回滚 / 复现用 |
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`sha256:d327c0f584b42a3147ef4e9e67b9992f564d6bc67dd8257eb43154425bc31a63`（`latest` 与 `sha-413f3e8` 指向同一镜像）。
+- 当前镜像 digest：`sha256:4a78326d80932a326070c652e3d8889530bf7956e5663495cef3fd17500f3198`（`latest` 与 `sha-cfea038` 指向同一镜像）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
@@ -227,7 +226,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ### 已有部署的升级步骤（必做）
 
-1. 更新镜像（**新闻部件是新增代码，不换镜像不会出现**）：Hub 推送恢复后删旧镜像重拉 `latest`；或现在就用 `homepage-image-20261106.tar` 按 5-C 导入，并把 YAML 的 `image` 改成导入后的实际名称。
+1. 更新镜像（**新闻部件是新增代码，不换镜像不会出现**）：新版已推送 Hub，删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest` → 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时可用 `homepage-image-20261106.tar` 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
 2. 把新的 `widgets.yaml` 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖旧文件。**不要动 `bookmarks.yaml`**。可直接用随本次更新提供的 `homepage-widgets-update.zip`。
 3. Container Manager → 项目 → 停止 → 清除并重建（或 SSH `docker compose down && docker compose up -d`）。
 4. 浏览器 **Ctrl+F5** 强制刷新。
@@ -347,7 +346,7 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
    docker images --digests | grep homepage-bookmark-manager
    ```
 
-   确认 digest 是 `sha256:d327c0f584b4…c31a63`（见第 5 节 A）再回第 6 节重建项目。
+   确认 digest 是 `sha256:4a78326d8093…f3198`（见第 5 节 A）再回第 6 节重建项目。
 
 > 加速站是第三方服务，随时可能失效。备用源 `https://hub.rat.dev`（同样实测 `docker pull` 成功）。`/v2/` 返回 401 是正常的鉴权挑战，不代表不可用；**换源前用 `docker pull <源域名>/boyu233/homepage-bookmark-manager:latest` 实测一次**再改配置。
 
