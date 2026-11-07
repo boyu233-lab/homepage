@@ -127,11 +127,11 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ### A. 直接拉取已发布镜像（推荐，当前可用）
 
-> ✅ **2026-11-07 11:58 更新完成**：在「多引擎搜索 / 中文时间 / 首页常驻新闻列表 + 来源筛选」基础上，镜像内置的 `custom.css` 已更新为**左侧导航固定位置**（切换分组不跳动，见 6.3 节）。`:latest` 与 `:sha-2b2a4c3` 两个标签已推送 Docker Hub。
-> 当前 digest：`sha256:0c58819d5d01b4a0e3a9b7e56fa4c6d43b1b143120d90e0c6e4ad528f8cff16a`（`linux/amd64`）。
-> - **升级已有部署**：① 用 `homepage-nav-fix.zip` 覆盖配置目录里的 `custom.css`（**必做**，见 6.3 节；入口脚本不会覆盖你改过的配置文件）；② 需要一并更新镜像时，删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目。若还没做 6.2 节的三部件升级，也按 **6.2 节**覆盖 `widgets.yaml` 与 `custom.js`。
+> ✅ **2026-11-07 12:44 更新完成**：在「多引擎搜索 / 中文时间 / 首页常驻新闻列表 + 来源筛选 + 左侧导航固定位置」基础上，镜像内置的 `custom.js` / `custom.css` 已更新为**分组卡片区与新闻窗口同起点、同高度**（切换分组内容区不跳动，见 6.4 节）。`:latest` 与 `:sha-91876c4` 两个标签已推送 Docker Hub。
+> 当前 digest：`sha256:a47d668b463b1cfc6d73056d26dd6bf27bd1bbc11f20121501ae2538116cfe16`（`linux/amd64`）。
+> - **升级已有部署**：① 用 `homepage-panel-align.zip` 覆盖配置目录里的 `custom.js` **和 `custom.css`**（**必做**，见 6.3 / 6.4 节；入口脚本不会覆盖你改过的配置文件）；② 需要一并更新镜像时，删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目。若还没做 6.2 节的三部件升级，也按 **6.2 节**覆盖 `widgets.yaml`。
 > - 容器内实测 `/api/widgets/news?index=3` 返回 `feedNames: ["百度新闻","新浪国内","IT之家"]` 与 24 条新闻；**没有 `feedNames` 或返回 404 = 仍是旧镜像**。
-> - 离线兜底：`homepage-image-20261107.tar`（80MB，**已重新导出为 11:58 版**，含导航固定位置）按 **C 方案**导入；NAS 上若有同名旧文件，先删再传。`homepage-image-20261106.tar` 是更旧的一版（轮播 + 下拉窗口），不要用。
+> - 离线兜底：`homepage-image-20261107.tar`（80MB，**已重新导出为 12:44 版**，含导航固定 + 卡片区对齐）按 **C 方案**导入；NAS 上若有同名旧文件，先删再传。`homepage-image-20261106.tar` 是更旧的一版（轮播 + 下拉窗口），不要用。
 > - 国内加速源可能仍缓存上一版，拉完请按 **8.1 节**核对 digest；不一致就等同步或改用 tar 导入。
 
 镜像已构建并推送到 Docker Hub，**公开仓库、免登录**，`linux/amd64`，YAML 里已填好地址：
@@ -139,13 +139,14 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 | 标签 | 用途 |
 |---|---|
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
-| `boyu233/homepage-bookmark-manager:sha-2b2a4c3` | 当前固定版本（**导航固定位置 + 常驻新闻列表 + 来源筛选 + 内置脱敏定制配置**，见 6.1 / 6.2 / 6.3 节），回滚 / 复现用 |
-| `boyu233/homepage-bookmark-manager:sha-4d61e9b` | 上一版（常驻新闻列表，但导航仍会随内容跳动），需要回退时用 |
-| `boyu233/homepage-bookmark-manager:sha-cfea038` | 更早一版（轮播一条 + 点击展开下拉窗口） |
+| `boyu233/homepage-bookmark-manager:sha-91876c4` | 当前固定版本（**卡片区与新闻窗口对齐 + 导航固定 + 常驻新闻列表 + 来源筛选 + 内置脱敏定制配置**，见 6.1 / 6.2 / 6.3 / 6.4 节），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-2b2a4c3` | 上一版（导航固定，但卡片区仍会跳到页面顶部），需要回退时用 |
+| `boyu233/homepage-bookmark-manager:sha-4d61e9b` | 更早一版（常驻新闻列表，导航会随内容跳动） |
+| `boyu233/homepage-bookmark-manager:sha-cfea038` | 最早一版（轮播一条 + 点击展开下拉窗口） |
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`sha256:0c58819d5d01b4a0e3a9b7e56fa4c6d43b1b143120d90e0c6e4ad528f8cff16a`（`latest` 与 `sha-2b2a4c3` 指向同一镜像）。
+- 当前镜像 digest：`sha256:a47d668b463b1cfc6d73056d26dd6bf27bd1bbc11f20121501ae2538116cfe16`（`latest` 与 `sha-91876c4` 指向同一镜像）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
@@ -195,7 +196,7 @@ Container Manager → **映像 → 导入 → 上传** `homepage.tar`，导入�
 
 识别「官方原版」用的指纹存放在镜像 `/app/skeleton-official/`（仓库 `deploy/skeleton-official/`，即上游原版 skeleton）。内置书签是**脱敏演示版**（搜索引擎 / 社区与开发，仅百度、Google、GitHub 等公开地址），不含任何私有地址、标签或凭据。
 
-> 升级步骤：**删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5**；**全新部署**不用手动上传配置文件，但**已有部署**因为配置文件已存在，需要按 6.2 / 6.3 节覆盖 `custom.css` 等文件才能拿到新排版。若重建后仍是官方外观，看容器日志有没有 `Applied bundled default:` —— 没有就说明拉到的还是旧镜像。
+> 升级步骤：**删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5**；**全新部署**不用手动上传配置文件，但**已有部署**因为配置文件已存在，需要按 6.2 / 6.3 / 6.4 节覆盖 `custom.js` / `custom.css` 等文件才能拿到新排版。若重建后仍是官方外观，看容器日志有没有 `Applied bundled default:` —— 没有就说明拉到的还是旧镜像。
 >
 > custom.js / custom.css 有浏览器缓存，**Ctrl+F5 必须做**。
 
@@ -228,8 +229,8 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ### 已有部署的升级步骤（必做）
 
-1. 更新镜像（**常驻列表与来源筛选是新增组件代码，不换镜像不会出现**）：删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest`（当前 digest `sha256:0c58819d…f16a`）→ 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时用 `homepage-image-20261107.tar` 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
-2. 把新的 `widgets.yaml`、`custom.js` **和 `custom.css`** 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml`**。可用 `homepage-layout-update.zip`（三件套）后，再用 `homepage-nav-fix.zip` 覆盖一次 `custom.css`（导航固定位置，最新版）。
+1. 更新镜像（**常驻列表与来源筛选是新增组件代码，不换镜像不会出现**）：删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest`（当前 digest `sha256:a47d668b…6cfe16`）→ 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时用 `homepage-image-20261107.tar` 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
+2. 把新的 `widgets.yaml`、`custom.js` **和 `custom.css`** 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml`**。可用 `homepage-layout-update.zip`（三件套）后，再用 `homepage-panel-align.zip` 覆盖一次 `custom.js` + `custom.css`（导航固定 + 卡片区对齐，最新版）。
 3. Container Manager → 项目 → 停止 → 清除并重建（或 SSH `docker compose down && docker compose up -d`）。
 4. 浏览器 **Ctrl+F5** 强制刷新。
 
@@ -271,14 +272,35 @@ curl -i http://127.0.0.1:3030/manage | head -5
 - 滚动页面时它随内容一起走，不是一直贴在屏幕上的悬浮层；
 - 窄屏（≤860px）列宽收窄到 140px，手机（≤560px）改为顶部横排标签条。
 
-**已有部署升级**：本次只改 `custom.css`（`custom.js` 未变），覆盖配置文件即可生效；镜像内 `src/skeleton/custom.css` 也已同步，全新部署开箱即带新位置。
+**已有部署升级**：这一节本身只改 `custom.css`；若还要 6.4 的卡片区对齐，直接用 6.4 节的 `homepage-panel-align.zip`（含 `custom.js` + `custom.css` 两个文件）一次覆盖即可。镜像内 `src/skeleton/` 也已同步，全新部署开箱即带新位置。
 
-1. 把 `homepage-nav-fix.zip` 里的 `custom.css` 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml` / `widgets.yaml` / `custom.js`**。
+1. 把升级包里的 `custom.css`（必要时含 `custom.js`）上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml` / `widgets.yaml`**。
 2. 浏览器 **Ctrl+F5** 强制刷新（`custom.css` 有浏览器缓存）；容器不用重启。
 3. 自检：停在「首页」（大字时间 + 新闻）记住左侧导航高度 → 点「搜索引擎」→ 高度完全一致即成功。
 4. 微调：改 `custom.css` 里 `.group-nav` 的 `top`（数值越大越靠下）和 `left`；窄屏在文件末尾两个 `@media` 里改。
 
-> 若同时要升级镜像：先删旧镜像重拉 `latest`（见 5-A），再执行上面 1-2 步。入口脚本**不会覆盖你改过的配置文件**，只换镜像、不覆盖 `custom.css` 的话，导航仍是旧位置。
+> 若同时要升级镜像：先删旧镜像重拉 `latest`（见 5-A），再执行上面 1-2 步。入口脚本**不会覆盖你改过的配置文件**，只换镜像、不覆盖配置文件的话，导航仍是旧位置。
+
+---
+
+## 6.4 分组卡片区与首页新闻窗口对齐（2026-11-07）
+
+**问题**：点左侧导航切到「搜索引擎」等分组时，时间 / 新闻隐藏让顶部信息条变矮，右侧卡片区跟着跳回页面顶部，与首页新闻窗口的位置、高度都不一致，切换前后视觉跳动。
+
+**现在**：`custom.js` 在首页视图测量 `.information-widget-news` 相对页面主容器的 `top` 与高度，写入 `:root` 的 `--news-panel-top` / `--news-panel-height`，并缓存到 `localStorage["homepage.newsPanel"]`；`custom.css` 用这两个变量把非首页视图的激活分组卡片区定位到**同一起点、同一高度**：
+
+- 切换分组前后，右侧内容区上下位置不变、高度不变；
+- 新闻条数变化、来源筛选标签换行等导致窗口变高时，`ResizeObserver` 自动重测，卡片区跟着变；
+- 卡片多到超出窗口时在该区域内滚动；手机（≤560px）改为等高下限、自然撑开，不做内部滚动；
+- 首次访问就停在某个分组（localStorage 记住了上次选择）也能立刻对齐，因为测量值已缓存；极端情况没测到时用兜底 `230px / 300px`。
+
+**已有部署升级**：本次改的是 `custom.js` + `custom.css` 两个**配置文件**，覆盖这两个文件 + Ctrl+F5 即可，不用重启容器；镜像内 skeleton 也已同步，全新部署开箱即带。
+
+1. 用 `homepage-panel-align.zip` 覆盖配置目录里的 `custom.js` 与 `custom.css`（**两个都要**），不要动 `bookmarks.yaml` / `widgets.yaml`。
+2. 浏览器 **Ctrl+F5**。
+3. 自检：首页新闻窗口顶边与切到「搜索引擎」后卡片区顶边在同一水平线，两块高度一致。
+
+> 微调：水平位置改 `custom.css` 末尾 `body:not(.home-view) ... .nav-active` 的 `left` / `width`；垂直位置与高度由 `custom.js` 自动测量，不建议写死，兜底值在 CSS 的 `var()` 第二个参数里。
 
 ---
 
