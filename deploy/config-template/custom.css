@@ -665,3 +665,43 @@ body.home-view .nav-layout > .services-group {
   flex-shrink: 0;
   color: #a78bfa;
 }
+
+/* ============ 分组视图:卡片区与首页新闻窗口同起点、同高度 ============
+   custom.js 在首页视图测量 .information-widget-news 相对主容器的 top 与高度,
+   写入 :root 的 --news-panel-top / --news-panel-height(并缓存到 localStorage)。
+   测不到时用兜底值 230px / 300px。切换分组时卡片区不再跳到页面顶部,
+   而是与首页新闻窗口落在同一垂直位置、占同样高度。 */
+body:not(.home-view) .nav-layout > .bookmark-group.nav-active,
+body:not(.home-view) .nav-layout > .services-group.nav-active {
+  position: absolute;
+  top: var(--news-panel-top, 230px);
+  left: 244px;
+  width: calc(100% - 244px - 32px);
+  height: var(--news-panel-height, 300px) !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 0 2px 6px 0;
+  flex: none;
+}
+
+@media (max-width: 860px) {
+  body:not(.home-view) .nav-layout > .bookmark-group.nav-active,
+  body:not(.home-view) .nav-layout > .services-group.nav-active {
+    left: 170px;
+    width: calc(100% - 170px - 16px);
+  }
+}
+
+@media (max-width: 560px) {
+  body:not(.home-view) .nav-layout > .bookmark-group.nav-active,
+  body:not(.home-view) .nav-layout > .services-group.nav-active {
+    position: static;
+    left: auto;
+    width: auto;
+    height: auto !important;
+    min-height: var(--news-panel-height, 300px) !important;
+    overflow: visible !important;
+  }
+}

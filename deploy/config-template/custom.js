@@ -47,6 +47,63 @@
     try { localStorage.setItem(key, value); } catch (e) { /* 隐私模式忽略 */ }
   }
 
+  /* ============ 分组视图与首页新闻窗口对齐 ============
+     首页视图下测量新闻窗口相对主容器的 top / 高度,写入 :root CSS 变量;
+     custom.css 用这两个变量把分组卡片区定位到同一起点、同一高度。
+     数值缓存到 localStorage:首次访问就停在某个分组时也能立刻对齐。 */
+  var PANEL_KEY = "homepage.newsPanel";
+  var panelObserver = null;
+  var panelTarget = null;
+
+  function applyPanelMetrics(top, height, persist) {
+    document.documentElement.style.setProperty("--news-panel-top", top + "px");
+    document.documentElement.style.setProperty("--news-panel-height", height + "px");
+    if (persist !== false) {
+      try { localStorage.setItem(PANEL_KEY, JSON.stringify({ top: top, height: height })); } catch (e) {}
+    }
+  }
+
+  function restorePanelMetrics() {
+    try {
+      var raw = localStorage.getItem(PANEL_KEY);
+      if (!raw) return;
+      var m = JSON.parse(raw);
+      if (m && m.top > 0 && m.height > 0) applyPanelMetrics(m.top, m.height, false);
+    } catch (e) { /* 缓存损坏就等下次测量 */ }
+  }
+
+  function measureNewsPanel() {
+    if (!document.body || !document.body.classList.contains("home-view")) return;
+    var news = document.querySelector(".information-widget-news");
+    var host = document.querySelector("#inner_wrapper > div");
+    if (!news || !host) return;
+    var n = news.getBoundingClientRect();
+    if (!n.height) return;                 // 新闻被隐藏 / 还没渲染,不覆盖缓存
+    var h = host.getBoundingClientRect();
+    var height = Math.round(n.height);
+    if (height < 40) return;               // 「正在获取新闻…」占位,等列表回来再测
+    applyPanelMetrics(Math.max(0, Math.round(n.top - h.top)), height);
+  }
+
+  function watchNewsPanel() {
+    if (typeof ResizeObserver === "undefined") return;
+    var news = document.querySelector(".information-widget-news");
+    if (!news) return;
+    if (panelObserver && panelTarget === news) return;
+    if (panelObserver) panelObserver.disconnect();
+    panelObserver = new ResizeObserver(function () { measureNewsPanel(); });
+    panelObserver.observe(news);
+    panelTarget = news;
+  }
+
+  function schedulePanelMeasure() {
+    watchNewsPanel();
+    // 新闻异步拉取,首屏与几次重绘后各测一次,确保拿到完整列表高度
+    setTimeout(measureNewsPanel, 0);
+    setTimeout(measureNewsPanel, 350);
+    setTimeout(measureNewsPanel, 1200);
+  }
+
   /* ============ 左侧分组导航 ============ */
 
   function getGroups() {
@@ -98,6 +155,7 @@
       });
     }
     lsSet(STORAGE_KEY, name);
+    if (isHome) schedulePanelMeasure();   // 回到首页时刷新新闻窗口尺寸
   }
 
   function homeIcon() {
@@ -293,6 +351,7 @@
 
   function start() {
     setupBgSwitch();
+    restorePanelMetrics();               // 先恢复上次测量值,首次就在分组视图也不会错位
     if (initNav()) {
       watchContainer();
       return true;
