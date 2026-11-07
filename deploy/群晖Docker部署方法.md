@@ -1,5 +1,7 @@
 # 群晖 Docker 部署方法（Homepage 书签管理版）
 
+> **版本 v1.0.0（2026-11-07 定版）** — 对应 git tag `v1.0.0`、镜像 `:v1.0.0`（与 `:latest`、`:sha-91876c4` 同一镜像）、digest `sha256:a47d668b463b1cfc6d73056d26dd6bf27bd1bbc11f20121501ae2538116cfe16`。变更历史见仓库 `CHANGELOG.md`，离线交付见 `homepage-release-v1.0.0/` 归档包。
+
 > 配套 YAML：[`synology-compose.yaml`](./synology-compose.yaml)
 > 适用：群晖 DSM 7.2+ / Container Manager，**x86_64 机型**（已发布的镜像是 `linux/amd64`）
 > 本文与配套 YAML 均同步在 GitHub fork 的 `dev` 分支；镜像地址是已发布的实际地址，鉴权凭据与内网地址仍为占位符，不含真实口令、密钥或私有地址。
@@ -138,6 +140,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 | 标签 | 用途 |
 |---|---|
+| `boyu233/homepage-bookmark-manager:v1.0.0` | **定版标签**（2026-11-07，与 `latest` / `sha-91876c4` 同 digest），推荐部署时固定使用，避免后续 `latest` 变动影响复现 |
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
 | `boyu233/homepage-bookmark-manager:sha-91876c4` | 当前固定版本（**卡片区与新闻窗口对齐 + 导航固定 + 常驻新闻列表 + 来源筛选 + 内置脱敏定制配置**，见 6.1 / 6.2 / 6.3 / 6.4 节），回滚 / 复现用 |
 | `boyu233/homepage-bookmark-manager:sha-2b2a4c3` | 上一版（导航固定，但卡片区仍会跳到页面顶部），需要回退时用 |
