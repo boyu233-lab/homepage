@@ -73,6 +73,6 @@ curl -i http://127.0.0.1:3030/manage | head -5
 - 左侧导航最上方固定「首页」虚拟分组（小房子图标），首次访问默认进入；选中状态存 localStorage。
 - 首页视图（`body.home-view`）下，顶部信息条里的 **搜索框 → 中文时间 → 实时新闻** 上下居中堆叠；时间字号 `clamp(2rem, 4.4vw, 3.4rem)`、`font-weight: 800`；书签卡片隐藏，形成干净起始页。
 - 切到其它书签分组时，时间与新闻自动隐藏，顶部只留资源信息与搜索框。
-- 左侧标题列由 `.nav-layout { min-height: 62vh }` + `.group-nav { align-self: center }` 上下居中。
+- 左侧导航**任何屏宽都保持竖排**（不再有 ≤860px 收成横向滚动条的规则），整列由 `.nav-layout { min-height: 62vh }` + `.group-nav { align-self: center; margin: auto 0 }` 在左侧上下居中。
 
 调整入口：集中在 `custom.css` 末尾「首页视图」区块（字号、宽度、居中高度、是否显示书签）；默认视图在 `custom.js` 的 `activate(HOME_GROUP)`；部件顺序与格式在 `widgets.yaml`。改完记得 Ctrl+F5，custom.js / custom.css 有浏览器缓存。
