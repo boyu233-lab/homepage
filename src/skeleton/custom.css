@@ -239,20 +239,21 @@ input[placeholder*="搜索"]:focus {
   flex-wrap: nowrap !important;
   align-items: flex-start;
   gap: 22px;
+  min-height: 62vh;     /* 给左侧标题列提供垂直居中的空间 */
 }
 
 /* 左侧竖排导航列
-   注意:不要用 sticky 的 top 来"下移"标题 —— top 会受分组高度/是否可滚动影响,
-   切换书签多的分组时标题会往下跳。想下移请统一改 margin-top(固定值)。 */
+   上下居中:由 .nav-layout 的 min-height + align-self:center 实现,
+   不依赖 sticky 的 top(会受分组高度/滚动影响,切换分组时标题会跳)。 */
 .group-nav {
   flex: 0 0 190px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   position: sticky;
-  top: 14px;            /* 仅用于滚动时贴顶,不要调大 */
-  margin-top: 0;        /* 四个标题整体下移量,调这里;对所有分组恒定 */
-  align-self: flex-start;
+  top: 14px;            /* 仅用于内容很长时滚动贴顶,不要调大 */
+  margin-top: 0;
+  align-self: center;   /* 左侧标题整体上下居中 */
   z-index: 20;
 }
 
@@ -357,12 +358,14 @@ input[placeholder*="搜索"]:focus {
 @media (max-width: 860px) {
   .nav-layout {
     flex-wrap: wrap !important;
+    min-height: 0;
   }
   .group-nav {
     flex: 1 1 100%;
     flex-direction: row;
     overflow-x: auto;
     position: static;
+    align-self: flex-start;
   }
   .group-nav-item {
     width: auto;
@@ -384,4 +387,107 @@ input[placeholder*="搜索"]:focus {
   .bookmark > a:hover {
     transform: none !important;
   }
+}
+
+/* ============ 首页视图:搜索框 / 大时间 / 新闻 居中堆叠 ============
+   由 custom.js 在选中「首页」时给 body 加 .home-view。
+   DOM 节点保持 React 原样,只改排布,时间每秒刷新与新闻轮播不受影响。 */
+
+/* 非首页分组:时间、新闻不显示,顶部信息条只留资源与搜索框 */
+body:not(.home-view) .information-widget-datetime,
+body:not(.home-view) .information-widget-news {
+  display: none !important;
+}
+
+body.home-view #information-widgets {
+  position: relative;
+}
+
+body.home-view #widgets-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+/* 资源部件缩小固定在左上角,不挤占中间的居中区域 */
+body.home-view #widgets-wrap > .information-widget-resources,
+body.home-view #widgets-wrap > div:not(#information-widgets-right) {
+  position: absolute;
+  top: 8px;
+  left: 4px;
+  opacity: 0.55;
+  transform: scale(0.86);
+  transform-origin: top left;
+}
+
+body.home-view #information-widgets-right {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 30px 0 12px;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 22px;
+}
+
+/* ① 搜索框居中(grow 会让它在纵向被拉伸,这里一并关掉) */
+body.home-view .information-widget-search {
+  width: min(560px, 92%) !important;
+  max-width: none !important;
+  flex-grow: 0 !important;
+  flex-basis: auto !important;
+  margin: 0 !important;
+}
+
+/* ② 时间:搜索框下方,左右居中,字号加大加粗 */
+body.home-view .information-widget-datetime {
+  width: 100% !important;
+  text-align: center;
+}
+
+body.home-view .information-widget-datetime span {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: clamp(2rem, 4.4vw, 3.4rem) !important;
+  font-weight: 800 !important;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: #f5f1ff !important;
+  text-shadow: 0 3px 22px rgba(124, 58, 237, 0.5);
+}
+
+/* ③ 新闻:时间下方,居中显示一条,可展开列表 */
+body.home-view .information-widget-news {
+  width: min(640px, 92%) !important;
+  align-self: center;
+}
+
+body.home-view .information-widget-news > div {
+  width: 100%;
+  max-width: none;
+  justify-content: center;
+}
+
+body.home-view .information-widget-news a[title] {
+  font-size: 0.95rem !important;
+  text-align: center;
+}
+
+/* 首页视图隐藏书签分组,呈现干净的起始页 */
+body.home-view .nav-layout > .bookmark-group,
+body.home-view .nav-layout > .services-group {
+  display: none !important;
+}
+
+/* 首页导航项的小房子图标 */
+.group-nav-home-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #a78bfa;
 }

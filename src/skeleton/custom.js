@@ -14,6 +14,8 @@
 
   var STORAGE_KEY = "homepage.activeGroup";
   var BG_MODE_KEY = "homepage.bgMode";   // "pattern" | "bing"
+  var HOME_GROUP = "__home__";           // 左侧「首页」虚拟分组
+  var HOME_LABEL = "首页";
 
   /* ============ 壁纸图源(集中配置,想自托管只改这里) ============
    * - 私有化:把下面两组换成你自己 Nginx / NAS / 对象存储上的图片 URL,
@@ -79,9 +81,14 @@
     if (window.scrollY) window.scrollTo(0, 0);
   }
 
+  // 首页是虚拟分组:只切换 body.home-view,不激活任何书签分组。
+  // 搜索框 / 时间 / 新闻的居中堆叠布局全部由 custom.css 在 .home-view 下接管。
   function activate(name) {
+    var isHome = name === HOME_GROUP;
+    if (document.body) document.body.classList.toggle("home-view", isHome);
+
     getGroups().forEach(function (g) {
-      var active = groupName(g) === name;
+      var active = !isHome && groupName(g) === name;
       g.classList.toggle("nav-active", active);
       if (active) unclip(g);
     });
@@ -91,6 +98,32 @@
       });
     }
     lsSet(STORAGE_KEY, name);
+  }
+
+  function homeIcon() {
+    var span = document.createElement("span");
+    span.className = "group-nav-home-icon";
+    span.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>';
+    return span;
+  }
+
+  function makeNavItem(name, label, icon, isHome) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "group-nav-item" + (isHome ? " group-nav-home" : "");
+    btn.setAttribute("data-group", name);
+    if (icon) btn.appendChild(icon.cloneNode(true));
+
+    var text = document.createElement("span");
+    text.className = "group-nav-name";
+    text.textContent = label;
+    btn.appendChild(text);
+
+    btn.addEventListener("click", function () {
+      activate(name);
+      resetScroll();
+    });
+    return btn;
   }
 
   function buildNav() {
@@ -105,49 +138,33 @@
       container.classList.add("nav-layout");
     }
 
-    // 分组集合变化时重建导航项
+    // 分组集合变化时重建导航项(首页固定排第一)
     var names = groups.map(groupName);
+    var navNames = [HOME_GROUP].concat(names);
     var existing = Array.prototype.map.call(nav.children, function (el) {
       return el.getAttribute("data-group");
     });
-    if (names.join("|") !== existing.join("|")) {
+    if (navNames.join("|") !== existing.join("|")) {
       nav.innerHTML = "";
+      nav.appendChild(makeNavItem(HOME_GROUP, HOME_LABEL, homeIcon(), true));
       groups.forEach(function (g) {
-        var name = groupName(g);
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "group-nav-item";
-        btn.setAttribute("data-group", name);
-
-        // 克隆分组图标(不动 React 管理的原节点)
         var header = g.querySelector(":scope > button");
         var icon = header
           ? header.querySelector(".bookmark-group-icon, .services-group-icon")
           : null;
-        if (icon) btn.appendChild(icon.cloneNode(true));
-
-        var label = document.createElement("span");
-        label.className = "group-nav-name";
-        label.textContent = name;
-        btn.appendChild(label);
-
-        btn.addEventListener("click", function () {
-          activate(name);
-          resetScroll();
-        });
-        nav.appendChild(btn);
+        nav.appendChild(makeNavItem(groupName(g), groupName(g), icon, false));
       });
     }
 
-    // 恢复上次选中;否则默认第一个分组
+    // 恢复上次选中;首次访问默认停在「首页」
     var saved = lsGet(STORAGE_KEY, "");
     var current = container.querySelector(".nav-active");
-    if (current && names.indexOf(groupName(current)) !== -1) {
+    if (current && navNames.indexOf(groupName(current)) !== -1) {
       activate(groupName(current));
-    } else if (saved && names.indexOf(saved) !== -1) {
+    } else if (saved && navNames.indexOf(saved) !== -1) {
       activate(saved);
     } else {
-      activate(names[0]);
+      activate(HOME_GROUP);
     }
     return true;
   }

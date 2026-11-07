@@ -1,10 +1,8 @@
 # Homepage - 顶部信息部件（脱敏默认配置）
-# 1) 搜索框：provider 写成数组即可在输入框右侧下拉切换引擎，选择会记在浏览器里。
-#    可选值：baidu / bing / google / duckduckgo / brave / custom；第一个是默认引擎。
-#    如需输入联想词，加 showSearchSuggestions: true（会把关键词发到对应引擎，注意隐私）。
-# 2) datetime：中文日期时间，format 用 Intl.DateTimeFormat 选项。
-# 3) news：实时新闻，由服务端代理拉取 RSS，浏览器不会直连新闻源。
-#    换新闻源：给容器加环境变量 HOMEPAGE_NEWS_FEEDS=源1,源2（RSS/Atom 地址）。
+# 左侧「首页」分组的布局由 custom.js + custom.css 接管：
+#   搜索框 → 大号加粗时间 → 实时新闻，三者上下居中堆叠。
+# 切到其它书签分组时，时间与新闻自动隐藏，顶部只留资源信息与搜索框。
+# 注意：search / datetime / news 的先后顺序决定首页视图里的上下顺序，不要随意调换。
 
 - resources:
     cpu: true
@@ -22,7 +20,7 @@
     focus: false
 
 - datetime:
-    text_size: lg
+    text_size: 2xl
     locale: zh-CN
     format:
       dateStyle: full

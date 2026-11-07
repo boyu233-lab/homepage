@@ -65,3 +65,14 @@ curl -i http://127.0.0.1:3030/manage | head -5
 - **分组图标**：`settings.yaml` 末尾有注释掉的 `layout` 示例，取消注释并把「你的分组名」改成 `bookmarks.yaml` 里的真实分组名，图标用 `mdi-xxx` / `si-xxx`。不写也能正常显示。
 - **壁纸自托管**：`custom.js` 顶部 `WALLPAPER_TODAY` / `WALLPAPER_RANDOM` 换成自己 NAS/Nginx 上的图片 URL；两组都写成 `[]` 可彻底关闭第三方图片请求，页面保持极光背景。
 - **关闭左侧导航**：清空 `custom.js` 即可（壁纸按钮会一起消失）。
+
+## 首页视图布局（2026-11-07）
+
+`custom.js` / `custom.css` / `widgets.yaml` 三件套协同，已有部署**只需覆盖这 3 个文件并重建项目**，不需要换镜像（前提是镜像已含 `news` 部件）：
+
+- 左侧导航最上方固定「首页」虚拟分组（小房子图标），首次访问默认进入；选中状态存 localStorage。
+- 首页视图（`body.home-view`）下，顶部信息条里的 **搜索框 → 中文时间 → 实时新闻** 上下居中堆叠；时间字号 `clamp(2rem, 4.4vw, 3.4rem)`、`font-weight: 800`；书签卡片隐藏，形成干净起始页。
+- 切到其它书签分组时，时间与新闻自动隐藏，顶部只留资源信息与搜索框。
+- 左侧标题列由 `.nav-layout { min-height: 62vh }` + `.group-nav { align-self: center }` 上下居中。
+
+调整入口：集中在 `custom.css` 末尾「首页视图」区块（字号、宽度、居中高度、是否显示书签）；默认视图在 `custom.js` 的 `activate(HOME_GROUP)`；部件顺序与格式在 `widgets.yaml`。改完记得 Ctrl+F5，custom.js / custom.css 有浏览器缓存。
