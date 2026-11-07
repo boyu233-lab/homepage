@@ -216,18 +216,18 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ## 6.2 首页三个部件：多引擎搜索 / 时间 / 实时新闻
 
-顶部信息条由 `widgets.yaml` 决定。新版镜像内置了下面这份配置，**全新部署自动生效**；已有部署因为配置文件已经存在（入口脚本刻意不覆盖用户改过的配置），需要按下面 4 步手动上传一次 `widgets.yaml`。
+顶部信息条由 `widgets.yaml` 决定，首页视图的排版由 `custom.css` 接管。新版镜像内置了这两份配置，**全新部署自动生效**；已有部署因为配置文件已经存在（入口脚本刻意不覆盖用户改过的配置），需要按下面 4 步手动覆盖一次。
 
 | 部件 | 怎么用 | 配置键 |
 |---|---|---|
 | 搜索框 | 输入框右侧图标点开，可切换 **百度 / Bing / Google / DuckDuckGo / Brave**；选择记在浏览器 localStorage，下次打开沿用。默认引擎是数组第一项（百度） | `search.provider`（数组） |
-| 时间 | 显示「2026年11月6日星期五 20:58:47」，每秒更新 | `datetime` |
-| 实时新闻 | 顶部轮播一条（8 秒切换），点 RSS 图标或箭头展开 8 条列表，点标题新标签打开原文；5 分钟自动刷新，也可点刷新按钮 | `news` |
+| 时间 | 显示「2026年11月7日星期六 10:52:00」，每秒更新 | `datetime` |
+| 实时新闻 | **直接在首页铺开 8 条列表**（没有下拉浮层、不再轮播）：每条含来源徽标 + 标题 + 时间，点标题新标签打开原文；顶部「全部 / 百度新闻 / …」标签可切换来源，选择记在浏览器；5 分钟自动刷新，也可点刷新按钮 | `news` |
 
 ### 已有部署的升级步骤（必做）
 
-1. 更新镜像（**新闻部件是新增代码，不换镜像不会出现**）：新版已推送 Hub，删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest` → 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时可用 `homepage-image-20261106.tar` 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
-2. 把新的 `widgets.yaml` 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖旧文件。**不要动 `bookmarks.yaml`**。可直接用随本次更新提供的 `homepage-widgets-update.zip`。
+1. 更新镜像（**常驻列表与来源筛选是新增组件代码，不换镜像不会出现**）：删掉 NAS 上的旧镜像 → 重新拉取 `boyu233/homepage-bookmark-manager:latest` → 重建项目。国内直连拉不动见 **8.1 节**换加速源；完全离线时可用导出的 tar 按 **5-C** 导入（导入后把 YAML 的 `image` 改成实际名称）。
+2. 把新的 `widgets.yaml` **和 `custom.css`** 上传到配置目录（compose `volumes` 冒号**左侧**的宿主机路径），覆盖同名文件。**不要动 `bookmarks.yaml`**。可直接用随本次更新提供的 `homepage-layout-update.zip`（含 3 个定制文件 + 说明）。
 3. Container Manager → 项目 → 停止 → 清除并重建（或 SSH `docker compose down && docker compose up -d`）。
 4. 浏览器 **Ctrl+F5** 强制刷新。
 
@@ -236,16 +236,26 @@ curl -i http://127.0.0.1:3030/manage | head -5
 - **换默认引擎**：把 `search.provider` 里想要的引擎挪到第一位，或删掉不用的。可选值 `baidu` / `bing` / `google` / `duckduckgo` / `brave` / `custom`。
 - **输入联想词**：给 `search` 加 `showSearchSuggestions: true`。它会把正在输入的关键词发到对应引擎（由服务端代理），在意隐私就不要开；默认关闭。
 - **时间格式**：`datetime.format` 用 `Intl.DateTimeFormat` 选项，例如 `{ dateStyle: "short", timeStyle: "medium" }`；`text_size` 可取 `sm` ~ `4xl`。
-- **新闻源**：默认 3 个中文 RSS（百度新闻 / 新浪国内 / IT之家），由**容器内服务端**并发拉取、每个源取前 8 条、合并去重按时间排序、缓存 5 分钟。浏览器不直连第三方；单个源 8 秒超时自动跳过，全部失败只显示「新闻暂不可用」，不影响首页其它部分。想完全自托管或换源，在 compose 的 `environment` 里加：
+- **新闻来源可选**（两层，互不冲突）：
+  - **页面点选（访客用）**：列表上方自动出现「全部 + 每个已启用来源」标签，点谁只显示谁，选择记在浏览器 localStorage，下次打开沿用。不想要这排标签就把 `news.showSourceFilter` 设为 `false`。
+  - **启用哪些源（部署者用）**：在 compose 的 `environment` 里加一行，从内置源里挑（写 key 或中文名都行），不写则默认 `baidu,sina,ithome`：
 
-  ```yaml
-  HOMEPAGE_NEWS_FEEDS: "https://你的域名/rss.xml,https://另一个/rss.xml"
-  ```
+    ```yaml
+    HOMEPAGE_NEWS_SOURCES: "baidu,ithome,sspai"
+    ```
 
-  也可以在 `widgets.yaml` 的 `news` 下写 `url: <单个 RSS 地址>`（该字段会被服务端清理，不会下发到前端）。支持 RSS 2.0 / Atom。⚠️ 第三方源看得到 **NAS 的出口 IP**，但看不到访客 IP；介意就换成自己 NAS 上的 RSS 聚合。
-- **条数与刷新**：`news.limit`（默认 8）、`news.refreshInterval`（毫秒，默认 300000）。
+    可用 key：`baidu`（百度新闻）、`sina`（新浪国内）、`ithome`（IT之家）、`sspai`（少数派）、`sina-tech`（新浪科技）。改完**必须重建容器**（env 在创建时固定）。
+  - **完全自定义源**：`HOMEPAGE_NEWS_FEEDS` 或 `widgets.yaml` 里私有的 `news.url`，逗号分隔多个，支持「名称=地址」以便筛选标签显示中文名：
 
-> 排错：新闻一直停在「正在获取新闻…」→ 先在 NAS 上 `docker exec homepage wget -qO- 'https://news.baidu.com/n?cmd=1&class=civilnews&tn=rss' | head -c 200` 确认容器能出网；再确认拉的是新版镜像、`widgets.yaml` 里有 `- news:`。
+    ```yaml
+    HOMEPAGE_NEWS_FEEDS: "公司公告=https://example.com/rss.xml,IT之家=https://www.ithome.com/rss/"
+    ```
+
+    `url` 字段不会下发到前端。优先级：`HOMEPAGE_NEWS_SOURCES` > `HOMEPAGE_NEWS_FEEDS` > `news.url` > 默认三源。
+  - 源由**容器内服务端**并发拉取、每源取前 8 条、合并去重按时间排序、缓存 5 分钟；浏览器不直连第三方，单个源 8 秒超时自动跳过。支持 RSS 2.0 / Atom。⚠️ 第三方源看得到 **NAS 的出口 IP**，但看不到访客 IP；介意就换成自己 NAS 上的 RSS 聚合。
+- **条数与刷新**：`news.limit`（默认 8，最多 30，直接决定首页铺开几行）、`news.refreshInterval`（毫秒，默认 300000）。
+
+> 排错：新闻一直停在「正在获取新闻…」→ 先在 NAS 上 `docker exec homepage wget -qO- 'https://news.baidu.com/n?cmd=1&class=civilnews&tn=rss' | head -c 200` 确认容器能出网；再确认拉的是新版镜像、`widgets.yaml` 里有 `- news:`。若页面仍是「轮播一条 + 点击展开的小窗口」，说明**还是旧镜像或浏览器缓存**：先 Ctrl+F5 / 无痕窗口，再核对镜像 digest。
 
 ---
 

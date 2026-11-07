@@ -28,5 +28,14 @@
 
 - news:
     label: 实时新闻
-    limit: 8
+    limit: 8                # 首页直接铺开显示几条（1-30），不再需要点开下拉窗口
     refreshInterval: 300000
+    showSourceFilter: true # 顶部来源标签「全部 / 百度新闻 / ...」，点选只显示该来源，选择记在浏览器里
+
+    # ---- 新闻来源可选（两种方式，二选一，不写则默认 百度新闻 + 新浪国内 + IT之家）----
+    # 方式 1：在 compose 的 environment 里加一行，从内置源里挑（也可写中文名）
+    #   HOMEPAGE_NEWS_SOURCES: "baidu,ithome,sspai"
+    #   可用 key：baidu / sina / ithome / sspai / sina-tech
+    # 方式 2：完全自定义 URL，环境变量 HOMEPAGE_NEWS_FEEDS 或下面这个私有的 url，
+    #   逗号分隔多个，支持「名称=地址」；url 字段不会下发到前端。
+    #   例：HOMEPAGE_NEWS_FEEDS: "公司公告=https://example.com/rss.xml,IT之家=https://www.ithome.com/rss/"
