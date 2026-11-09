@@ -5,6 +5,50 @@
 
 ---
 
+## v1.0.2 — 2026-11-09
+
+**定位**：首页新增「B站音乐榜」部件（榜单 + 官方播放器内嵌播放），百度热搜与音乐榜改为左右并排。组件层 + 配置层同时改动：**必须换镜像，且必须同步三个配置文件**。
+
+### 变更
+
+| 模块 | 内容 |
+|---|---|
+| 新增部件 | `bilibili_music`：服务端代理 B站音乐区排行榜（`ranking/v2?rid=3&type=all`），解析排名 / 标题 / UP主 / 时长 / 播放数 / 点赞数 / 分区；点击条目在当前页挂载 B站官方 `player.bilibili.com` iframe 播放 |
+| 播放交互 | 播放器视图**替换**榜单（不叠加），带「榜单」返回、上一首 / 下一首循环切歌、在 B站打开；点击后才挂载 iframe，符合浏览器自动播放策略 |
+| 首页布局 | `#information-widgets-right` 改为两列 grid：搜索框与中文时间跨整行，热搜 / 音乐各占一列；≤900px 回落单栏上下堆叠 |
+| 分组对齐 | `custom.js` 同时观察两个面板，取联合外框（最小 top / 最大 bottom）写入 `--news-panel-top` / `--news-panel-height`，任一边变高都会重新对齐 |
+| 安全与隐私 | 上游地址与 `rid` 写死不可配置（防 SSRF）；`bvid` 用 `/^BV[0-9A-Za-z]{10}$/` 白名单校验，链接由服务端拼接、不透传上游 URL；标题 / UP主截断 + React 转义；榜单由容器代理，仅点播时浏览器才直连 B站 |
+| 刷新周期 | **B站音乐榜 24 小时**（音乐区日榜按天更新）：`widgets.yaml` 的 `bilibili_music.refreshInterval: 86400000` 同时决定前端轮询与服务端缓存；服务端 TTL clamp 到 1 分钟 ~ 7 天，工具栏显示「更新于 MM/DD HH:mm」。手动刷新按钮带 `force=1` 可跳过缓存立即重拉（保留 60 秒最小间隔防风控）。**百度热搜仍为 60 秒实时刷新**，不受影响 |
+| 配置模板 | `src/skeleton/` 与 `deploy/config-template/` 同步：`widgets.yaml` 新增 `bilibili_music` 段，`custom.js` / `custom.css` 更新双栏布局，三副本 sha256 校验一致 |
+| 测试 | 新增 API 10 例 + 组件 9 例（解析、bvid 白名单过滤、50 条上限、24 小时缓存与 TTL clamp、force 强制刷新 / 最小间隔、风控降级、播放器挂载 / 切歌 / 返回、limit、空态、格式化边界）；本版定向 19/19 通过 |
+
+### 升级 / 兼容性
+
+1. **必须换镜像**：重拉 `:v1.0.2` → 重建项目 → Ctrl+F5。只覆盖配置文件会出现 `Missing bilibili_music`。
+2. **必须同步三个配置文件**：`widgets.yaml`、`custom.js`、`custom.css`。入口脚本不会覆盖已修改过的非空文件。最省事的做法：把挂载目录里这三个文件**删掉**（先备份 `custom.js` 里自定义过的 `WALLPAPER_*` 图源），重启容器，入口脚本会从镜像内置 skeleton 自动补齐 v1.0.2 版；**`bookmarks.yaml` 千万别删**。
+   - 只换镜像不更配置 → 音乐部件不出现（旧 `widgets.yaml` 没有该段），首页仍是单栏热搜。
+   - 只更配置不换镜像 → 页面显示 `Missing bilibili_music`。
+3. `settings.yaml` / `services.yaml` / `bookmarks.yaml` 不用动；compose 里的 `HOMEPAGE_NEWS_SOURCES` / `HOMEPAGE_NEWS_FEEDS` 仍建议删掉（v1.0.1 起已失效）。
+4. 自检 `/api/widgets/bilibili_music?index=4`：应返回 `boardName: "音乐榜"`、`feedNames: ["B站音乐榜"]`、`total >= 50`，条目带 `bvid` / `rank` / `link`（`https://www.bilibili.com/video/BV...`）。
+
+### 已知限制
+
+- 榜单依赖容器出网 `api.bilibili.com`；被风控（返回 `code != 0`）或离线时显示「音乐榜暂不可用」，其余功能正常。上游失败不写缓存，下次请求会重试。
+- 音乐榜默认 **24 小时**才更新一次是设计行为（日榜）；容器重启会清空内存缓存并立即重拉，工具栏刷新按钮也能提前重拉。
+- 播放器是 B站官方 iframe，由**浏览器直连** B站，点播时会向 B站暴露访客 IP / Referer；榜单接口由容器代理，不暴露访客 IP。
+- 浏览器禁止无手势自动播放，必须点一下榜单条目；部分浏览器还会拦 iframe 内自动播，此时再点播放器里的播放键即可。
+- 「在 B站打开」跳视频页，不是纯音频；B站没有公开音频流接口，未做音频流代理（WBI 签名 + 防盗链 + CORS，易失效）。
+- 接口是 B站未公开承诺的 Web 接口，上游改版需同步调整解析。
+
+### 发布坐标
+
+- 镜像：`boyu233/homepage-bookmark-manager:v1.0.2` = `:latest` = `:sha-PENDING_SHA`
+- Digest：`PENDING_DIGEST`（`linux/amd64`，Registry API 核验）
+- 代码：commit `PENDING_SHA`、git tag `v1.0.2`，分支 `dev` / `feat/bookmark-manager`
+- 离线镜像：`homepage-image-v1.0.2.tar`（`docker load` 导入）
+
+---
+
 ## v1.0.1 — 2026-11-09
 
 **定位**：新闻部件从「RSS 新闻聚合」改为「百度热搜榜」（纯榜单）。改的是组件代码，**必须换镜像**。

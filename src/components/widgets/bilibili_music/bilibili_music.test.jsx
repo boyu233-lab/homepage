@@ -69,6 +69,7 @@ describe("components/widgets/bilibili_music — B站音乐榜", () => {
   beforeEach(() => {
     swrMock.mockReset();
     mutate.mockReset();
+    global.fetch = vi.fn(async () => ({ json: async () => payload }));
     mockSWR();
   });
 
@@ -138,10 +139,19 @@ describe("components/widgets/bilibili_music — B站音乐榜", () => {
     expect(screen.getAllByRole("button", { name: /^播放 / })).toHaveLength(2);
   });
 
-  it("手动刷新触发 SWR mutate", () => {
+  it("默认 24 小时刷新，间隔透传给服务端缓存", () => {
+    render(<BilibiliMusic options={{ index: 4 }} />);
+    expect(swrMock).toHaveBeenCalledWith(
+      expect.stringContaining("refreshInterval=86400000"),
+      expect.objectContaining({ refreshInterval: 86400000 }),
+    );
+  });
+
+  it("手动刷新走 force=1 强制重拉，不受 24 小时缓存影响", () => {
     render(<BilibiliMusic options={{ index: 4 }} />);
     fireEvent.click(screen.getByRole("button", { name: "刷新音乐榜" }));
     expect(mutate).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("force=1"));
   });
 
   it("没有数据或请求失败时显示提示而不是空白", () => {

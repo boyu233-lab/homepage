@@ -8,11 +8,24 @@ const logger = createLogger("bilibili_music");
 // rid=3 音乐区 / type=all，地址写死且不接受配置里的 URL，避免 SSRF。
 const RANKING_URL = "https://api.bilibili.com/x/web-interface/ranking/v2?rid=3&type=all";
 const SOURCE_NAME = "B站音乐榜";
-const CACHE_TTL_MS = 5 * 60 * 1000; // 榜单小时级更新，缓存 5 分钟，避免触发风控
+
+// 音乐区排行榜按天更新，默认缓存 24 小时；实际周期由 widgets.yaml 的
+// bilibili_music.refreshInterval 经前端透传，clamp 到 1 分钟 ~ 7 天。
+const DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MIN_CACHE_TTL_MS = 60 * 1000;
+const MAX_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// 手动刷新（force=1）也保留最小间隔，避免被反复调用触发 B站风控
+const FORCE_MIN_INTERVAL_MS = 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_ITEMS = 50;
 const BVID_PATTERN = /^BV[0-9A-Za-z]{10}$/;
 let cache = null;
+
+export function cacheTTL(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms <= 0) return DEFAULT_CACHE_TTL_MS;
+  return Math.min(MAX_CACHE_TTL_MS, Math.max(MIN_CACHE_TTL_MS, ms));
+}
 
 function text(value, max = 120) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -63,8 +76,13 @@ export function normalizeRanking(json) {
   };
 }
 
-async function loadRanking() {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.payload;
+export async function loadRanking({ ttl = DEFAULT_CACHE_TTL_MS, force = false } = {}) {
+  if (cache) {
+    const age = Date.now() - cache.at;
+    // 无论自动还是手动，都保留 60 秒最小间隔，防止被刷触发风控
+    if (age < FORCE_MIN_INTERVAL_MS) return cache.payload;
+    if (!force && age < ttl) return cache.payload;
+  }
 
   const response = await fetch(RANKING_URL, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -82,12 +100,12 @@ async function loadRanking() {
 }
 
 async function handler(req, res) {
-  const { index } = req.query;
+  const { index, force, refreshInterval } = req.query;
   await getPrivateWidgetOptions("bilibili_music", index);
 
   let payload;
   try {
-    payload = await loadRanking();
+    payload = await loadRanking({ ttl: cacheTTL(refreshInterval), force: force === "1" });
   } catch (error) {
     logger.error("B站音乐榜获取失败: %s", error?.message ?? String(error));
     payload = {

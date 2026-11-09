@@ -15,6 +15,8 @@ import Raw from "../widget/raw";
 
 const RANK_COLORS = ["#f87171", "#fb923c", "#fbbf24"];
 const PLAYER_BASE = "https://player.bilibili.com/player.html";
+// B站音乐区排行榜按天更新，默认 24 小时刷新一次（widgets.yaml 可覆盖）
+const DEFAULT_REFRESH_MS = 24 * 60 * 60 * 1000;
 
 export function formatCount(value) {
   const number = Number(value);
@@ -34,11 +36,13 @@ export function formatDuration(value) {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(rest)}` : `${minutes}:${pad(rest)}`;
 }
 
+// 24 小时周期下只显示 HH:mm 看不出是哪天，带上月/日
 function formatUpdateTime(value) {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(parsed.getMonth() + 1)}/${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 }
 
 function rankStyle(item) {
@@ -66,17 +70,20 @@ export default function BilibiliMusic({ options }) {
     index,
     label = "B站音乐榜",
     limit = 10,
-    refreshInterval = 300000,
+    refreshInterval = DEFAULT_REFRESH_MS,
     target = "_blank",
   } = options;
 
-  const { data, error, isValidating, mutate } = useSWR(
-    `/api/widgets/bilibili_music?${new URLSearchParams({ index: String(index ?? 0) })}`,
-    {
-      refreshInterval: Math.max(60000, Number(refreshInterval) || 300000),
-      revalidateOnFocus: false,
-    },
-  );
+  const refreshMs = Math.max(60000, Number(refreshInterval) || DEFAULT_REFRESH_MS);
+  const key = `/api/widgets/bilibili_music?${new URLSearchParams({
+    index: String(index ?? 0),
+    refreshInterval: String(refreshMs),
+  })}`;
+
+  const { data, error, isValidating, mutate } = useSWR(key, {
+    refreshInterval: refreshMs,
+    revalidateOnFocus: false,
+  });
 
   const maxItems = Math.min(50, Math.max(1, Number(limit) || 10));
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -92,6 +99,10 @@ export default function BilibiliMusic({ options }) {
     setPlaying(visible[next].bvid);
   };
 
+  // 24 小时服务端缓存下，普通 mutate 只会拿回缓存；带 force=1 才真正重拉上游
+  const refresh = () =>
+    mutate(fetch(`${key}&force=1`).then((response) => response.json()), { revalidate: false });
+
   return (
     <Container options={options} additionalClassNames="information-widget-bilibili_music">
       <Raw>
@@ -104,7 +115,7 @@ export default function BilibiliMusic({ options }) {
             )}
             <button
               type="button"
-              onClick={() => mutate()}
+              onClick={refresh}
               title="刷新音乐榜"
               aria-label="刷新音乐榜"
               className="bili-refresh"

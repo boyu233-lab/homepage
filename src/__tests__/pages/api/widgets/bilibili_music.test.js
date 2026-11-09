@@ -52,9 +52,9 @@ async function loadHandler() {
   return (await import("pages/api/widgets/bilibili_music")).default;
 }
 
-async function call(handler) {
+async function call(handler, query = { index: "4" }) {
   const res = makeRes();
-  await (handler || (await loadHandler()))({ query: { index: "4" } }, res);
+  await (handler || (await loadHandler()))({ query }, res);
   return res;
 }
 
@@ -127,12 +127,55 @@ describe("pages/api/widgets/bilibili_music — B站音乐区排行榜", () => {
     expect(res.payload.total).toBe(60);
   });
 
-  it("5 分钟内复用缓存，不重复请求上游", async () => {
+  it("缓存有效期内复用，不重复请求上游", async () => {
     const handler = await loadHandler();
-    await call(handler);
-    await call(handler);
+    await call(handler, { index: "4", refreshInterval: "86400000" });
+    await call(handler, { index: "4", refreshInterval: "86400000" });
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(getOptionsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("cacheTTL 默认 24 小时，并把配置 clamp 到 1 分钟 ~ 7 天", async () => {
+    const { cacheTTL } = await import("pages/api/widgets/bilibili_music");
+    expect(cacheTTL(undefined)).toBe(24 * 60 * 60 * 1000);
+    expect(cacheTTL("86400000")).toBe(24 * 60 * 60 * 1000);
+    expect(cacheTTL(1000)).toBe(60 * 1000);
+    expect(cacheTTL(100 * 24 * 60 * 60 * 1000)).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(cacheTTL("not-a-number")).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it("默认 24 小时缓存：24 小时内不重拉，超过后自动重拉", async () => {
+    vi.useFakeTimers();
+    try {
+      const handler = await loadHandler();
+      const query = { index: "4", refreshInterval: "86400000" };
+      await call(handler, query);
+      vi.setSystemTime(Date.now() + 23 * 60 * 60 * 1000);
+      await call(handler, query);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
+      await call(handler, query);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("手动刷新 force=1 跳过 24 小时缓存，但 60 秒内仍受最小间隔保护", async () => {
+    vi.useFakeTimers();
+    try {
+      const handler = await loadHandler();
+      await call(handler, { index: "4", refreshInterval: "86400000" });
+      await call(handler, { index: "4", refreshInterval: "86400000", force: "1" });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(Date.now() + 61 * 1000);
+      await call(handler, { index: "4", refreshInterval: "86400000", force: "1" });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("上游 HTTP 失败时返回空列表与错误标记，并记录日志", async () => {

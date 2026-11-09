@@ -38,8 +38,8 @@
 
 - bilibili_music:
     label: B站音乐榜
-    limit: 10               # 榜单条数（1-50）
-    refreshInterval: 300000 # 服务端缓存 5 分钟，前端同频刷新
+    limit: 10                    # 榜单条数（1-50）
+    refreshInterval: 86400000    # 日榜按天更新：24 小时刷新一次（前端轮询 + 服务端缓存同周期）
     target: _blank
 
     # 音乐区排行榜由服务端固定代理（api.bilibili.com /x/web-interface/ranking/v2?rid=3），
