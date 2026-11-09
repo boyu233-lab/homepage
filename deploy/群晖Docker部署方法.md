@@ -1,6 +1,6 @@
 # 群晖 Docker 部署方法（Homepage 书签管理版）
 
-> **版本 v1.0.2（2026-11-09）** — 首页新增 **B站音乐榜**（榜单 + 官方播放器内嵌播放），百度热搜与音乐榜**左右并排**，见 **6.6 节**；对应 git tag `v1.0.2`、镜像 `:v1.0.2` = `:latest` = `:sha-PENDING_SHA`、digest `PENDING_DIGEST`。
+> **版本 v1.0.2（2026-11-09）** — 首页新增 **B站音乐榜**（榜单 + 官方播放器内嵌播放），百度热搜与音乐榜**左右并排**；热榜部件支持 **9 源标签切换**（百度 / 微博 / 知乎 / 头条 / 抖音 / B站热搜 + Bing / IT之家 / 少数派资讯），见 **6.6 节**。对应 git tag `v1.0.2`、镜像 `:v1.0.2` = `:latest` = `:sha-PENDING_SHA`、digest `PENDING_DIGEST`。
 > 上一版 v1.0.1（新闻改百度热搜榜）见 **6.5 节**；更早定版坐标见 `CHANGELOG.md`。变更历史见仓库 `CHANGELOG.md`。
 >
 > ⚠️ **v1.0.2 是组件层 + 配置层双改动**：除了换镜像，还必须同步 `widgets.yaml` / `custom.js` / `custom.css` 三个配置文件（详见 6.6 节）。只换镜像不会出现音乐部件。
@@ -388,6 +388,15 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 **刷新周期**：B站音乐区排行榜按天更新，默认 **24 小时**刷新一次（`widgets.yaml` → `bilibili_music.refreshInterval: 86400000`，单位毫秒）。这个值同时作用于前端轮询与服务端缓存（服务端 clamp 到 1 分钟 ~ 7 天），工具栏显示抓取日期+时间。想立刻拿最新榜单，点工具栏刷新按钮：请求带 `force=1` 跳过缓存重拉上游（保留 60 秒最小间隔，避免被刷触发 B站风控）。上游失败不写入缓存，下次请求会重试。**百度热搜是实时榜，仍为 60 秒刷新**，两个榜周期各自独立。容器重启会清空内存缓存，首次访问会立即重拉一次。
 
+**多源热榜标签**：热榜面板顶部新增一行来源标签（单行横向滚动，**不增加面板高度**），共 9 个来源，选择记在浏览器 `localStorage["homepage.newsSource"]`，刷新页面仍停在上次看的榜：
+
+| 类型 | 来源 | 服务端缓存 | 列表右侧 |
+|---|---|---|---|
+| 热榜 | 百度热搜、微博热搜、知乎热榜、头条热榜、抖音热榜、B站热搜 | 60 秒 | 热度（如 `780.8万`）+ 新 / 沸 / 热角标 |
+| 资讯 | Bing 资讯、IT之家、少数派 | 5 分钟 | 文章发布时间 `MM/DD HH:mm` |
+
+切换标签时前端只改 `/api/widgets/news?index=3&source=<key>`，服务端按源独立缓存，**单源失败不影响其它源**，且**不需要改 `widgets.yaml`**（来源列表写死在镜像代码里）。链接一律服务端按白名单拼接或只收 http(s)，请求不传 URL，防 SSRF。实测放弃的源：知乎网页版热榜 API（401）、36氪网关（500）、Bing 新闻 `format=rss`（已改版返回 HTML）；Bing 改用必应搜索 RSS，条目是**相关网页结果**而非新闻稿件列表。新浪系 / 百度新闻 RSS 仍是死源，未接回。
+
 **布局**：`#information-widgets-right` 改为两列 grid —— 搜索框、中文时间跨整行，百度热搜与 B站音乐各占一列（总宽 `min(1240px, 96%)`，间距 22px）；屏宽 ≤900px 回落单栏上下堆叠。播放器视图替换榜单而非叠加，两栏高度保持稳定。`custom.js` 的 `ResizeObserver` 同时观察两个面板，取最小 top / 最大 bottom 作为联合外框，6.4 节的卡片区对齐自动跟随。
 
 **隐私 / 安全**：榜单由容器代理，访客 IP 不外泄；播放器 iframe 由浏览器直连 B站，**仅在点播时**才会向 B站暴露访客 IP / Referer。上游地址与 `rid` 写死不可配置（防 SSRF），`bvid` 走 `/^BV[0-9A-Za-z]{10}$/` 白名单，链接由服务端拼接、不透传上游 URL。B站没有公开音频流接口，未做音频流代理。
@@ -414,6 +423,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 - 页面：搜索 → 时间 → 左右两栏（左热搜、右音乐）；点音乐条目出现 B站播放器，可切歌 / 返回榜单；窄屏 ≤900px 自动上下堆叠。
 - API：`http://<群晖地址>:<端口>/api/widgets/bilibili_music?index=4` 返回 `boardName: "音乐榜"`、`feedNames: ["B站音乐榜"]`、`total >= 50`，条目带 `bvid` / `rank` / `link`；首页显示 `Missing bilibili_music` 说明镜像还是 v1.0.1。
+- 多源：`http://<群晖地址>:<端口>/api/widgets/news?index=3&source=weibo` 返回 `sourceLabel: "微博热搜"`、`availableSources` 9 项；页面顶部能看到 9 个标签，点「IT之家」后右侧列显示发布时间。**不带 `source` 参数仍返回百度热搜**（兼容旧调用）。
 - 容器出网：`docker exec homepage wget -qO- 'https://api.bilibili.com/x/web-interface/ranking/v2?rid=3&type=all' | head -c 80` 应看到 `{"code":0`。
 - 配置生效：容器日志出现 `Applied bundled default: widgets.yaml`；或直接看配置目录 `widgets.yaml` 里是否有 `- bilibili_music:`。
 
@@ -423,6 +433,8 @@ curl -i http://127.0.0.1:3030/manage | head -5
 |---|---|
 | `Missing bilibili_music` | 旧镜像，删镜像重拉 `:v1.0.2` |
 | 一直转圈 / 「音乐榜暂不可用」 | 容器不能出网 `api.bilibili.com` 或被风控（`code != 0`），看 `docker logs homepage` 的 `B站音乐榜获取失败` |
+| 只有百度热搜、没有来源标签 | 镜像还是 v1.0.1（旧版不认 `source` 参数），删镜像重拉 `:v1.0.2` 后 Ctrl+F5 |
+| 某个标签显示「XX暂不可用」 | 该平台接口临时改版 / 反爬 / 容器出网被拦；点其它标签正常即说明是单源问题，稍后自动重试 |
 | 音乐榜一整天没变化 | 24 小时刷新是设定行为；点工具栏刷新按钮（`force=1`）可立即重拉。点了仍不变，确认距上次抓取已超过 60 秒且容器能出网 |
 | 想改刷新周期 | 改 `widgets.yaml` 的 `bilibili_music.refreshInterval`（毫秒），前端轮询与服务端缓存同时生效；Ctrl+F5 即可，**不用换镜像** |
 | 点击条目没声音 | 浏览器自动播放策略：再点一次播放器内的播放键；或检查广告拦截插件是否挡了 `player.bilibili.com` |

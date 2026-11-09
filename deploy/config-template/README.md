@@ -86,4 +86,4 @@ curl -i http://127.0.0.1:3030/manage | head -5
 > ⚠️ **v1.0.1 起 `HOMEPAGE_NEWS_SOURCES` / `HOMEPAGE_NEWS_FEEDS` / `news.url` 全部失效**，接口地址固定写死在组件里，详见部署文档 6.5 / 6.6 节。
 > ⚠️ 播放器 iframe 由浏览器直连 B站，点播时会向 B站暴露访客 IP / Referer；榜单接口由容器代理，不暴露。
 
-调整入口：集中在 `custom.css` 末尾「首页视图」区块（双栏宽度、窄屏断点、字号、配色）；默认视图在 `custom.js` 的 `activate(HOME_GROUP)`；部件顺序、`news.limit` / `bilibili_music.limit`（均 1-50）与刷新间隔在 `widgets.yaml`：`news.refreshInterval: 60000`（热搜实时）、`bilibili_music.refreshInterval: 86400000`（音乐日榜 24 小时，同时决定服务端缓存）。改完记得 Ctrl+F5，custom.js / custom.css 有浏览器缓存。
+调整入口：集中在 `custom.css` 末尾「首页视图」区块（双栏宽度、窄屏断点、字号、配色）；默认视图在 `custom.js` 的 `activate(HOME_GROUP)`；部件顺序、`news.limit` / `bilibili_music.limit`（均 1-50）与刷新间隔在 `widgets.yaml`：`news.refreshInterval: 60000`（热搜实时）、`bilibili_music.refreshInterval: 86400000`（音乐日榜 24 小时，同时决定服务端缓存）。**v1.0.2 起热榜面板顶部有 9 个来源标签**（百度 / 微博 / 知乎 / 头条 / 抖音 / B站热搜 + Bing / IT之家 / 少数派资讯），来源写死在镜像代码里、标签选择记在浏览器，不需要改 `widgets.yaml`。改完记得 Ctrl+F5，custom.js / custom.css 有浏览器缓存。
