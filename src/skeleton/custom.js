@@ -47,13 +47,15 @@
     try { localStorage.setItem(key, value); } catch (e) { /* 隐私模式忽略 */ }
   }
 
-  /* ============ 分组视图与首页新闻窗口对齐 ============
-     首页视图下测量新闻窗口相对主容器的 top / 高度,写入 :root CSS 变量;
-     custom.css 用这两个变量把分组卡片区定位到同一起点、同一高度。
+  /* ============ 分组视图与首页面板外框对齐 ============
+     首页视图下测量「热搜 + B站音乐」两栏的联合外框(最小 top / 最大 bottom),
+     相对主容器写入 :root CSS 变量;custom.css 用这两个变量把分组卡片区
+     定位到同一起点、同一高度。两栏并排时任一边变高都会重新对齐。
      数值缓存到 localStorage:首次访问就停在某个分组时也能立刻对齐。 */
   var PANEL_KEY = "homepage.newsPanel";
+  var PANEL_SELECTOR = ".information-widget-news, .information-widget-bilibili_music";
   var panelObserver = null;
-  var panelTarget = null;
+  var panelTargets = [];
 
   function applyPanelMetrics(top, height, persist) {
     document.documentElement.style.setProperty("--news-panel-top", top + "px");
@@ -74,26 +76,30 @@
 
   function measureNewsPanel() {
     if (!document.body || !document.body.classList.contains("home-view")) return;
-    var news = document.querySelector(".information-widget-news");
     var host = document.querySelector("#inner_wrapper > div");
-    if (!news || !host) return;
-    var n = news.getBoundingClientRect();
-    if (!n.height) return;                 // 新闻被隐藏 / 还没渲染,不覆盖缓存
+    if (!host) return;
+    var rects = Array.prototype.map.call(
+      document.querySelectorAll(PANEL_SELECTOR),
+      function (el) { return el.getBoundingClientRect(); }
+    ).filter(function (r) { return r.height >= 40; });  // 隐藏 / 占位态不参与测量
+    if (!rects.length) return;
+    var top = Math.min.apply(null, rects.map(function (r) { return r.top; }));
+    var bottom = Math.max.apply(null, rects.map(function (r) { return r.bottom; }));
     var h = host.getBoundingClientRect();
-    var height = Math.round(n.height);
-    if (height < 40) return;               // 「正在获取新闻…」占位,等列表回来再测
-    applyPanelMetrics(Math.max(0, Math.round(n.top - h.top)), height);
+    applyPanelMetrics(Math.max(0, Math.round(top - h.top)), Math.round(bottom - top));
   }
 
   function watchNewsPanel() {
     if (typeof ResizeObserver === "undefined") return;
-    var news = document.querySelector(".information-widget-news");
-    if (!news) return;
-    if (panelObserver && panelTarget === news) return;
+    var panels = Array.prototype.slice.call(document.querySelectorAll(PANEL_SELECTOR));
+    if (!panels.length) return;
+    var same = panelObserver && panelTargets.length === panels.length &&
+      panels.every(function (el, i) { return panelTargets[i] === el; });
+    if (same) return;
     if (panelObserver) panelObserver.disconnect();
     panelObserver = new ResizeObserver(function () { measureNewsPanel(); });
-    panelObserver.observe(news);
-    panelTarget = news;
+    panels.forEach(function (el) { panelObserver.observe(el); });
+    panelTargets = panels;
   }
 
   function schedulePanelMeasure() {

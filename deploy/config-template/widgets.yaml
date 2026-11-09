@@ -1,8 +1,8 @@
 # Homepage - 顶部信息部件（脱敏默认配置）
 # 左侧「首页」分组的布局由 custom.js + custom.css 接管：
-#   搜索框 → 大号加粗时间 → 百度热搜榜，三者上下居中堆叠。
-# 切到其它书签分组时，时间与新闻自动隐藏，顶部只留资源信息与搜索框。
-# 注意：search / datetime / news 的先后顺序决定首页视图里的上下顺序，不要随意调换。
+#   搜索框 → 大号加粗时间 → [百度热搜榜 | B站音乐榜] 左右并排（窄屏上下堆叠）。
+# 切到其它书签分组时，时间/热搜/音乐榜自动隐藏，顶部只留资源信息与搜索框。
+# 注意：search / datetime 必须排在前两位；news 与 bilibili_music 决定左右两栏顺序，不要随意调换。
 
 - resources:
     cpu: true
@@ -35,3 +35,13 @@
     # v1.0.1 起 fixed：本部件只显示百度热搜榜官方接口（服务端代理），不再聚合 RSS。
     # 旧的 HOMEPAGE_NEWS_SOURCES / HOMEPAGE_NEWS_FEEDS / news.url 已失效，
     # 留在 compose 里也不会报错，建议删掉。来源是内置固定地址，不可配置，避免 SSRF。
+
+- bilibili_music:
+    label: B站音乐榜
+    limit: 10               # 榜单条数（1-50）
+    refreshInterval: 300000 # 服务端缓存 5 分钟，前端同频刷新
+    target: _blank
+
+    # 音乐区排行榜由服务端固定代理（api.bilibili.com /x/web-interface/ranking/v2?rid=3），
+    # 点击条目在当前页挂载 B站官方播放器 iframe 播放。地址写死不可配置，避免 SSRF；
+    # 播放器由浏览器直连 B站，仅点播时才会向 B站暴露访客 IP / Referer。

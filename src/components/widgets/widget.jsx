@@ -17,6 +17,7 @@ const widgetMappings = {
   stocks: dynamic(() => import("components/widgets/stocks/stocks")),
   customapi: dynamic(() => import("components/widgets/customapi/customapi")),
   news: dynamic(() => import("components/widgets/news/news")),
+  bilibili_music: dynamic(() => import("components/widgets/bilibili_music/bilibili_music")),
 };
 
 export default function Widget({ widget, style }) {
