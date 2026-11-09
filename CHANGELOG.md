@@ -33,7 +33,12 @@
 
 ### 发布坐标
 
-> 构建发布后回填（镜像 digest、commit、离线 tar sha256、冒烟结果）。
+- `:v1.0.5` = `:latest` = `:sha-29ce39c`，digest `sha256:ed7761e280e50503778a086c47c670740bc2f912c2f2bdd7d51675b20702d7bc`（Registry API 核验三标签一致，linux/amd64）
+- 代码 commit `29ce39c`、git tag `v1.0.5`，分支 `dev` / `feat/bookmark-manager`
+- 离线镜像 `homepage-image-v1.0.5.tar`（81 MB，sha256 `ffe0a56abfcafa4f537f832d2171293b64c63d2b21e80b4ce0e9d59516d74407`）
+- 容器内冒烟：首页 200、选集 **131 个分P**（P1 晚星 / P2 夏恋 / P3 秋日私语）、B站搜索「纯音乐」19 条、第 2P 音频 `206 + audio/mp4 + Content-Range` + fMP4 `ftyp`、非法 cid 400、微博热搜 50 条 / 9 源
+- 镜像内置 `custom.css` / `custom.js` sha256 与仓库三副本一致
+- 发布排障：`registry.npmmirror.com` 临时 500（`team_packages` 表故障），改用 `registry.npmjs.org` 容器内构建；Docker Hub 19 MB 应用层经 daemon 代理反复 `broken pipe`，改用分块 Registry API 直传该 blob（1 MB/块）后再补推 manifest 与三个标签
 
 ---
 
