@@ -11,7 +11,9 @@ const logger = createLogger("news");
 const DEFAULT_SOURCE = "baidu";
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_ITEMS = 50;
-const USER_AGENT = "Mozilla/5.0 (compatible; homepage-news/1.2)";
+// 部分平台（B站热搜等）会对简写 / 自定义 UA 返回风控码，统一用完整浏览器头
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 const HOT_TAGS = { 1: "新", 2: "沸", 3: "热" };
 const TOUTIAO_LABELS = { hot: "热", new: "新" };
 
@@ -373,7 +375,8 @@ async function loadSource(key) {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: {
       "User-Agent": USER_AGENT,
-      Accept: source.kind === "news" ? "application/rss+xml, application/xml, text/xml, */*" : "application/json",
+      Accept: source.kind === "news" ? "application/rss+xml, application/xml, text/xml, */*" : "application/json, text/plain, */*",
+      "Accept-Language": "zh-CN,zh;q=0.9",
       Referer: source.referer,
     },
   });

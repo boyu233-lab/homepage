@@ -18,6 +18,9 @@ const MAX_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const FORCE_MIN_INTERVAL_MS = 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_ITEMS = 50;
+// B站风控会把自定义/简写 UA 判为爬虫并返回 code=-352；必须用完整浏览器头
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 const BVID_PATTERN = /^BV[0-9A-Za-z]{10}$/;
 let cache = null;
 
@@ -87,9 +90,11 @@ export async function loadRanking({ ttl = DEFAULT_CACHE_TTL_MS, force = false } 
   const response = await fetch(RANKING_URL, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; homepage-bilibili/1.0)",
-      Accept: "application/json",
+      "User-Agent": USER_AGENT,
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "zh-CN,zh;q=0.9",
       Referer: "https://www.bilibili.com/",
+      Origin: "https://www.bilibili.com",
     },
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);

@@ -90,7 +90,10 @@ describe("pages/api/widgets/bilibili_music — B站音乐区排行榜", () => {
     expect(global.fetch).toHaveBeenCalledWith(
       "https://api.bilibili.com/x/web-interface/ranking/v2?rid=3&type=all",
       expect.objectContaining({
-        headers: expect.objectContaining({ Referer: "https://www.bilibili.com/" }),
+        headers: expect.objectContaining({
+          Referer: "https://www.bilibili.com/",
+          "User-Agent": expect.stringContaining("AppleWebKit"), // 简写 UA 会被 B站风控 -352
+        }),
       }),
     );
   });
