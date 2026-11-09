@@ -33,6 +33,14 @@
 
 沿用 v1.0.3：音频经 NAS 转发占用出网带宽、免登录最高约 184kbps、少数视频无独立音轨、个别浏览器可能拦截带声音的自动播放。本版未引入新限制。全量 ESLint + Vitest 按此前取消未重跑，以定向测试 + 容器内链路冒烟为准。
 
+### 发布坐标
+
+- `:v1.0.4` = `:latest` = `:sha-b0d1eaf`，digest `sha256:c95bdefdf032489574532241b8548171e21a0e02cfa2519d0131c50e3a11e163`（Registry API 核验三标签一致，linux/amd64）
+- 代码 commit `b0d1eaf`、git tag `v1.0.4`，分支 `dev` / `feat/bookmark-manager`
+- 离线镜像 `homepage-image-v1.0.4.tar`（81 MB，sha256 `506492f0cab4dc3a36372da05ae0fccc2aff79aa4aa05266a5c8d0d45094ba70`）
+- 容器内冒烟：首页 200、微博热搜 50 条 / 9 源、B站搜索「晴天」18 条、音频代理 `206 + audio/mp4 + Content-Range`、fMP4 `ftyp`
+- 镜像内置 `custom.css` / `custom.js` sha256 与仓库三副本一致
+
 ---
 
 ## v1.0.3 — 2026-11-09
