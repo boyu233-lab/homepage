@@ -1,6 +1,6 @@
 # 群晖 Docker 部署方法（Homepage 书签管理版）
 
-> **版本 v1.0.3（2026-11-09）** — 右侧 B站部件改为 **「输入关键词搜索 → 手动点选 → 只播放声音、不显示画面」**，见 **6.7 节**；左侧 **9 源热榜标签切换** 与双栏布局不变（见 6.6 节）。对应 git tag `v1.0.3`、镜像 `:v1.0.3` = `:latest` = `:sha-PENDING_SHA`、digest `PENDING_DIGEST`。
+> **版本 v1.0.3（2026-11-09）** — 右侧 B站部件改为 **「输入关键词搜索 → 手动点选 → 只播放声音、不显示画面」**，见 **6.7 节**；左侧 **9 源热榜标签切换** 与双栏布局不变（见 6.6 节）。对应 git tag `v1.0.3`、镜像 `:v1.0.3` = `:latest` = `:sha-92da188`、digest `sha256:da152802081424e2583835fab3ff126bb16dac5ece0fed9d698d380d32b4df25`。
 > 上一版 v1.0.1（新闻改百度热搜榜）见 **6.5 节**；更早定版坐标见 `CHANGELOG.md`。变更历史见仓库 `CHANGELOG.md`。
 >
 > ⚠️ **v1.0.3 是组件层 + 配置层双改动**：除了换镜像，还必须同步 `widgets.yaml` / `custom.js` / `custom.css` 三个配置文件（详见 6.7 节）。只换镜像不会得到新版搜索 / 音频布局。
@@ -135,7 +135,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 > ⚠️ **以下为 v1.0.0 的更新记录**；当前版本是 v1.0.1（新闻部件改为百度热搜榜），见顶部版本块与 **6.5 节**。
 >
 > ✅ **2026-11-07 12:44 更新完成**：在「多引擎搜索 / 中文时间 / 首页常驻新闻列表 + 来源筛选 + 左侧导航固定位置」基础上，镜像内置的 `custom.js` / `custom.css` 已更新为**分组卡片区与新闻窗口同起点、同高度**（切换分组内容区不跳动，见 6.4 节）。`:latest` 与 `:sha-91876c4` 两个标签已推送 Docker Hub。
-> 当前 digest：`PENDING_DIGEST`（`linux/amd64`）。
+> 当前 digest：`sha256:da152802081424e2583835fab3ff126bb16dac5ece0fed9d698d380d32b4df25`（`linux/amd64`）。
 > - **升级已有部署**：① 用 `homepage-panel-align.zip` 覆盖配置目录里的 `custom.js` **和 `custom.css`**（**必做**，见 6.3 / 6.4 节；入口脚本不会覆盖你改过的配置文件）；② 需要一并更新镜像时，删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目。若还没做 6.2 节的三部件升级，也按 **6.2 节**覆盖 `widgets.yaml`。
 > - 容器内实测 `/api/widgets/news?index=3` 返回 `feedNames: ["百度新闻","新浪国内","IT之家"]` 与 24 条新闻；**没有 `feedNames` 或返回 404 = 仍是旧镜像**。
 > - 离线兜底：`homepage-image-20261107.tar`（80MB，**已重新导出为 12:44 版**，含导航固定 + 卡片区对齐）按 **C 方案**导入；NAS 上若有同名旧文件，先删再传。`homepage-image-20261106.tar` 是更旧的一版（轮播 + 下拉窗口），不要用。
@@ -147,7 +147,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 |---|---|
 | `boyu233/homepage-bookmark-manager:v1.0.3` | **当前定版标签**（2026-11-09，B站搜索 + 纯音频、9 源热榜 + 双栏首页，见 6.7 节），推荐部署时固定使用，避免 `latest` 漂移 |
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，与 `:v1.0.3` 同 digest；**配套 `synology-compose.yaml` 已固定为 `:v1.0.3`**，避免 Container Manager 吃 `latest` 本地缓存 |
-| `boyu233/homepage-bookmark-manager:sha-PENDING_SHA` | 当前固定版本（B站搜索 + 纯音频 + 9 源热榜 + 双栏布局），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-92da188` | 当前固定版本（B站搜索 + 纯音频 + 9 源热榜 + 双栏布局），回滚 / 复现用 |
 | `boyu233/homepage-bookmark-manager:v1.0.2` | 上一版（B站音乐榜 + 16:9 播放器），需要回退旧行为时用 |
 | `boyu233/homepage-bookmark-manager:v1.0.1` | 上一版定版（2026-11-09，百度热搜榜，见 6.5 节），需回退单栏布局时用 |
 | `boyu233/homepage-bookmark-manager:sha-390aaa3` | v1.0.1 对应的固定版本 |
@@ -159,7 +159,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`PENDING_DIGEST`（`latest` / `v1.0.3` / `sha-PENDING_SHA` 指向同一镜像）。
+- 当前镜像 digest：`sha256:da152802081424e2583835fab3ff126bb16dac5ece0fed9d698d380d32b4df25`（`latest` / `v1.0.3` / `sha-92da188` 指向同一镜像）。
 - v1.0.1 镜像 digest：`sha256:678821c624cf4f572cceb7f5ca42c7964b31a993ff9f4299e5613338ee71616d`（`v1.0.1` / `sha-390aaa3`）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 

@@ -46,9 +46,9 @@
 
 ### 发布坐标
 
-- 镜像：`boyu233/homepage-bookmark-manager:v1.0.3` = `:latest` = `:sha-PENDING_SHA`
-- Digest：`PENDING_DIGEST`（`linux/amd64`，Registry API 核验）
-- 代码：commit `PENDING_SHA`、git tag `v1.0.3`，分支 `dev` / `feat/bookmark-manager`
+- 镜像：`boyu233/homepage-bookmark-manager:v1.0.3` = `:latest` = `:sha-92da188`
+- Digest：`sha256:da152802081424e2583835fab3ff126bb16dac5ece0fed9d698d380d32b4df25`（`linux/amd64`，Registry API 核验）
+- 代码：commit `92da188`、git tag `v1.0.3`，分支 `dev` / `feat/bookmark-manager`
 - 离线镜像：`homepage-image-v1.0.3.tar`（`docker load` 导入）
 
 ---
