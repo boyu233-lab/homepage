@@ -5,6 +5,49 @@
 
 ---
 
+## v1.0.1 — 2026-11-09
+
+**定位**：新闻部件从「RSS 新闻聚合」改为「百度热搜榜」（纯榜单）。改的是组件代码，**必须换镜像**。
+
+### 变更
+
+| 模块 | 内容 |
+|---|---|
+| 数据源 | 改为百度热搜官方 JSON 接口 `top.baidu.com/api/board?platform=pc&tab=realtime`，服务端代理抓取；移除全部 RSS 源与并发聚合逻辑 |
+| 榜单展示 | 置顶条目（↑）+ 排名 1..50；前三名红/橙/黄徽标；右侧热度（如 `780.8万`）；「新 / 沸 / 热」角标；悬停显示摘要；工具栏显示榜单更新时间 |
+| 更新频率 | 服务端缓存 60 秒（原 5 分钟），前端默认 60 秒自动刷新，手动刷新按钮保留 |
+| 来源筛选 | 移除（只有单一榜单），不再读写 `localStorage["homepage.newsSource"]` |
+| 安全 | 接口地址固定不可配置（避免 SSRF）；链接只接受 http(s)；标题/摘要由 React 转义；上游失败返回空列表 + 错误标记，不抛出 |
+| 配置模板 | `src/skeleton/widgets.yaml` 与 `deploy/config-template/widgets.yaml` 同步为 `label: 百度热搜` / `limit: 10` / `refreshInterval: 60000` |
+
+### 为什么要改
+
+- 内置 `sina` / `sina-tech` RSS 分别在 **2018-09-23**、**2016-06-06** 之后停更，HTTP 仍返回 200；前端时间格式不带年份，看起来像「今年 9 月 23 日」。
+- 百度 RSS（`civilnews` 等）是低频「焦点精选」，实测 40+ 分钟首条不变；且每条 `pubDate` 都是**抓取时刻**，按时间倒序排序时会霸占「全部」前 8 条，把真新闻挤下去，表现为「时间一直很新、内容一直不换」。
+- 百度热搜榜分钟级更新，实测 1 小时内榜单顺序与条目已变化，并带真实 `updateTime`。
+
+### 升级 / 兼容性
+
+1. **必须换镜像**：删 NAS 旧镜像 → 重拉 `:v1.0.1`（或 `:latest`）→ 重建项目 → Ctrl+F5。只覆盖配置文件无效。
+2. `custom.js` / `custom.css` **不用动**：榜单复用现有 `.news-list` / `.news-source-badge` / `.news-item-time` 样式，排名与角标颜色用内联样式，不新增 CSS 依赖。`limit` 从 8 变 10 会让窗口变高，`ResizeObserver` 会自动重测，分组卡片区对齐仍有效。
+3. **旧环境变量失效**：`HOMEPAGE_NEWS_SOURCES`、`HOMEPAGE_NEWS_FEEDS`、`news.url` 不再被读取；留在 compose 里不会报错，建议删掉。
+4. 建议把用户配置目录 `widgets.yaml` 的 `news` 段改成 `label: 百度热搜` / `limit: 10` / `refreshInterval: 60000`（不改也能跑，只是标题仍显示「实时新闻」、只铺 8 条、5 分钟刷新）。
+5. 自检 `/api/widgets/news?index=3`：应返回 `boardName: "热搜榜"`、`feedNames: ["百度热搜"]`、`items[0].isTop: true`、条目带 `rank` / `hotScore`；若 `feedNames` 仍有「百度新闻 / 新浪国内」，说明还是 v1.0.0 镜像。
+
+### 已知限制
+
+- 依赖容器出网访问 `top.baidu.com`；离线或被拦截时显示「热搜暂不可用，稍后会自动重试」，其余功能正常。
+- 条目链接是百度搜索结果页，不是新闻原文（与官方热搜榜行为一致）。
+- 接口是百度未公开承诺的 Web 接口，上游改版需同步调整解析。
+
+### 发布坐标
+
+- 镜像：`boyu233/homepage-bookmark-manager:v1.0.1` = `:latest` = `:sha-PENDING`
+- Digest：`PENDING`（构建推送后回填）
+- 代码：git tag `v1.0.1`，分支 `dev` / `feat/bookmark-manager`
+
+---
+
 ## v1.0.0 — 2026-11-07（首个定版）
 
 **定位**：功能冻结、临时定版。可直接用于群晖 NAS 全新部署与已有部署升级。

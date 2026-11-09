@@ -1,117 +1,84 @@
 import classNames from "classnames";
-import { useState } from "react";
-import { FiRefreshCw, FiRss } from "react-icons/fi";
+import { FiRefreshCw, FiTrendingUp } from "react-icons/fi";
 import useSWR from "swr";
 
 import Container from "../widget/container";
 import Raw from "../widget/raw";
 
-const ALL_SOURCES = "__all__";
-const STORAGE_KEY = "homepage.newsSource";
+// 前三名用红/橙/黄，置顶用箭头，其余沿用 custom.css 的紫色徽标底
+const RANK_COLORS = ["#f87171", "#fb923c", "#fbbf24"];
 
-function readSavedSource() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) || ALL_SOURCES;
-  } catch {
-    return ALL_SOURCES;
-  }
+function formatHot(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return "";
+  return number >= 10000 ? `${(number / 10000).toFixed(1)}万` : String(number);
 }
 
-function saveSource(value) {
-  try {
-    localStorage.setItem(STORAGE_KEY, value);
-  } catch {
-    // 隐私模式下忽略
-  }
-}
-
-function formatDate(date) {
-  if (!date) return "";
-  const parsed = new Date(date);
+function formatUpdateTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return parsed.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+}
+
+function rankStyle(item) {
+  if (item.isTop) return { background: "rgba(248, 113, 113, 0.3)", color: "#fecaca" };
+  const rank = Number(item.rank);
+  if (rank >= 1 && rank <= 3) {
+    const color = RANK_COLORS[rank - 1];
+    return { background: `${color}2e`, color };
+  }
+  return undefined;
+}
+
+function tagStyle(tag) {
+  const isNew = tag === "新";
+  return {
+    marginLeft: 6,
+    padding: "1px 5px",
+    borderRadius: 4,
+    fontSize: "0.62rem",
+    background: isNew ? "rgba(248, 113, 113, 0.32)" : "rgba(251, 146, 60, 0.32)",
+    color: isNew ? "#fecaca" : "#fed7aa",
+  };
 }
 
 export default function News({ options }) {
   const {
     index,
-    label = "实时新闻",
-    limit = 8,
-    refreshInterval = 300000,
+    label = "实时热搜",
+    limit = 10,
+    refreshInterval = 60000,
     target = "_blank",
-    showSourceFilter = true,
   } = options;
-  // 惰性初始化：SSR 时 localStorage 不存在，readSavedSource 会回退到「全部」
-  const [source, setSource] = useState(readSavedSource);
 
   const { data, error, isValidating, mutate } = useSWR(
     `/api/widgets/news?${new URLSearchParams({ index: String(index ?? 0) })}`,
     {
-      refreshInterval: Math.max(60000, Number(refreshInterval) || 300000),
+      refreshInterval: Math.max(60000, Number(refreshInterval) || 60000),
       revalidateOnFocus: false,
     },
   );
 
-  const maxItems = Math.min(30, Math.max(1, Number(limit) || 8));
+  const maxItems = Math.min(50, Math.max(1, Number(limit) || 10));
   const items = Array.isArray(data?.items) ? data.items : [];
-  // 优先用服务端返回的已启用源列表；旧版接口没有该字段时从新闻条目里推断
-  const sources =
-    Array.isArray(data?.feedNames) && data.feedNames.length
-      ? data.feedNames
-      : Array.from(new Set(items.map((item) => item.source).filter(Boolean)));
-  // 选中的来源如果已被移除，回退到「全部」，避免列表一直空白
-  const effectiveSource = source === ALL_SOURCES || sources.includes(source) ? source : ALL_SOURCES;
-  const visible = items
-    .filter((item) => effectiveSource === ALL_SOURCES || item.source === effectiveSource)
-    .slice(0, maxItems);
-
-  function choose(value) {
-    setSource(value);
-    saveSource(value);
-  }
+  const visible = items.slice(0, maxItems);
 
   return (
     <Container options={options} additionalClassNames="information-widget-news">
       <Raw>
         <div className="news-widget w-full">
           <div className="news-toolbar">
-            <FiRss className="news-toolbar-icon w-4 h-4" aria-hidden="true" />
+            <FiTrendingUp className="news-toolbar-icon w-4 h-4" aria-hidden="true" />
             <span className="news-label">{label}</span>
-
-            {showSourceFilter && sources.length > 1 && (
-              <div className="news-source-filters" role="group" aria-label="选择新闻来源">
-                <button
-                  type="button"
-                  onClick={() => choose(ALL_SOURCES)}
-                  aria-pressed={effectiveSource === ALL_SOURCES}
-                  className={classNames("news-source-filter", effectiveSource === ALL_SOURCES && "active")}
-                >
-                  全部
-                </button>
-                {sources.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => choose(name)}
-                    aria-pressed={effectiveSource === name}
-                    className={classNames("news-source-filter", effectiveSource === name && "active")}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
+            {data?.updatedAt && (
+              <span className="news-item-time">更新于 {formatUpdateTime(data.updatedAt)}</span>
             )}
-
             <button
               type="button"
               onClick={() => mutate()}
-              title="刷新新闻"
-              aria-label="刷新新闻"
+              title="刷新热搜"
+              aria-label="刷新热搜"
               className="news-refresh"
             >
               <FiRefreshCw className={classNames("w-3.5 h-3.5", isValidating && "animate-spin")} />
@@ -119,22 +86,21 @@ export default function News({ options }) {
           </div>
 
           <ul className="news-list">
-            {error && <li className="news-empty">新闻暂不可用，稍后会自动重试</li>}
+            {error && <li className="news-empty">热搜暂不可用，稍后会自动重试</li>}
             {!error && visible.length === 0 && (
-              <li className="news-empty">
-                {isValidating
-                  ? "正在获取新闻…"
-                  : effectiveSource === ALL_SOURCES
-                    ? "暂无新闻，稍后会自动重试"
-                    : `「${effectiveSource}」暂无新闻`}
-              </li>
+              <li className="news-empty">{isValidating ? "正在获取热搜…" : "暂无热搜，稍后会自动重试"}</li>
             )}
             {visible.map((item, itemIndex) => (
               <li key={`${item.link}-${itemIndex}`} className="news-list-item">
-                <a href={item.link} target={target} rel="noreferrer" title={item.title}>
-                  <span className="news-source-badge">{item.source}</span>
-                  <span className="news-item-title">{item.title}</span>
-                  <span className="news-item-time">{formatDate(item.date)}</span>
+                <a href={item.link} target={target} rel="noreferrer" title={item.desc || item.title}>
+                  <span className="news-source-badge" style={rankStyle(item)}>
+                    {item.isTop ? "↑" : item.rank || itemIndex + 1}
+                  </span>
+                  <span className="news-item-title">
+                    {item.title}
+                    {item.hotTag && <span style={tagStyle(item.hotTag)}>{item.hotTag}</span>}
+                  </span>
+                  <span className="news-item-time">{formatHot(item.hotScore)}</span>
                 </a>
               </li>
             ))}

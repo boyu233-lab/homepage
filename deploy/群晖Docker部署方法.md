@@ -1,6 +1,6 @@
 # 群晖 Docker 部署方法（Homepage 书签管理版）
 
-> **版本 v1.0.0（2026-11-07 定版）** — 对应 git tag `v1.0.0`、镜像 `:v1.0.0`（与 `:latest`、`:sha-91876c4` 同一镜像）、digest `sha256:a47d668b463b1cfc6d73056d26dd6bf27bd1bbc11f20121501ae2538116cfe16`。变更历史见仓库 `CHANGELOG.md`，离线交付见 `homepage-release-v1.0.0/` 归档包。
+> **版本 v1.0.1（2026-11-09）** — 新闻部件已从 RSS 聚合改为**百度热搜榜**，见 **6.5 节**；对应 git tag `v1.0.1`、镜像 `:v1.0.1` = `:latest` = `:sha-PENDING_SHA`、digest `PENDING_DIGEST`。上一版定版坐标见 `CHANGELOG.md` v1.0.0 条目，离线交付见 `homepage-release-v1.0.0/` 归档包。变更历史见仓库 `CHANGELOG.md`。
 
 > 配套 YAML：[`synology-compose.yaml`](./synology-compose.yaml)
 > 适用：群晖 DSM 7.2+ / Container Manager，**x86_64 机型**（已发布的镜像是 `linux/amd64`）
@@ -140,16 +140,18 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 | 标签 | 用途 |
 |---|---|
-| `boyu233/homepage-bookmark-manager:v1.0.0` | **定版标签**（2026-11-07，与 `latest` / `sha-91876c4` 同 digest），推荐部署时固定使用，避免后续 `latest` 变动影响复现 |
-| `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用 |
-| `boyu233/homepage-bookmark-manager:sha-91876c4` | 当前固定版本（**卡片区与新闻窗口对齐 + 导航固定 + 常驻新闻列表 + 来源筛选 + 内置脱敏定制配置**，见 6.1 / 6.2 / 6.3 / 6.4 节），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:v1.0.1` | **当前定版标签**（2026-11-09，百度热搜榜，见 6.5 节），推荐部署时固定使用，避免 `latest` 漂移 |
+| `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用，与 `:v1.0.1` 同 digest |
+| `boyu233/homepage-bookmark-manager:sha-PENDING_SHA` | 当前固定版本（百度热搜榜 + 卡片区对齐 + 导航固定 + 脱敏定制配置），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:v1.0.0` | 上一版定版（2026-11-07，RSS 新闻聚合），需要回退旧行为时用 |
+| `boyu233/homepage-bookmark-manager:sha-91876c4` | v1.0.0 对应的固定版本 |
 | `boyu233/homepage-bookmark-manager:sha-2b2a4c3` | 上一版（导航固定，但卡片区仍会跳到页面顶部），需要回退时用 |
 | `boyu233/homepage-bookmark-manager:sha-4d61e9b` | 更早一版（常驻新闻列表，导航会随内容跳动） |
 | `boyu233/homepage-bookmark-manager:sha-cfea038` | 最早一版（轮播一条 + 点击展开下拉窗口） |
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`sha256:a47d668b463b1cfc6d73056d26dd6bf27bd1bbc11f20121501ae2538116cfe16`（`latest` 与 `sha-91876c4` 指向同一镜像）。
+- 当前镜像 digest：`PENDING_DIGEST`（`latest` / `v1.0.1` / `sha-PENDING_SHA` 指向同一镜像）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
@@ -220,7 +222,9 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ---
 
-## 6.2 首页三个部件：多引擎搜索 / 时间 / 实时新闻
+> ⚠️ **本节中「实时新闻 / 新闻来源」的描述是 v1.0.0 及更早镜像的行为。v1.0.1 起该部件已改为百度热搜榜，请以 [6.5 节](#65-v101新闻部件改为百度热搜榜2026-11-09) 为准**；搜索框、时间部件与升级步骤仍然有效。
+
+## 6.2 首页三个部件：多引擎搜索 / 时间 / 实时新闻（v1.0.0）
 
 顶部信息条由 `widgets.yaml` 决定，首页视图的排版由 `custom.css` 接管。新版镜像内置了这两份配置，**全新部署自动生效**；已有部署因为配置文件已经存在（入口脚本刻意不覆盖用户改过的配置），需要按下面 4 步手动覆盖一次。
 
@@ -242,7 +246,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 - **换默认引擎**：把 `search.provider` 里想要的引擎挪到第一位，或删掉不用的。可选值 `baidu` / `bing` / `google` / `duckduckgo` / `brave` / `custom`。
 - **输入联想词**：给 `search` 加 `showSearchSuggestions: true`。它会把正在输入的关键词发到对应引擎（由服务端代理），在意隐私就不要开；默认关闭。
 - **时间格式**：`datetime.format` 用 `Intl.DateTimeFormat` 选项，例如 `{ dateStyle: "short", timeStyle: "medium" }`；`text_size` 可取 `sm` ~ `4xl`。
-- **新闻来源可选**（两层，互不冲突）：
+- **新闻来源可选（v1.0.0 已废弃，v1.0.1 不再读取以下任何环境变量）**（两层，互不冲突）：
   - **页面点选（访客用）**：列表上方自动出现「全部 + 每个已启用来源」标签，点谁只显示谁，选择记在浏览器 localStorage，下次打开沿用。不想要这排标签就把 `news.showSourceFilter` 设为 `false`。
   - **启用哪些源（部署者用）**：在 compose 的 `environment` 里加一行，从内置源里挑（写 key 或中文名都行），不写则默认 `baidu,sina,ithome`：
 
@@ -304,6 +308,58 @@ curl -i http://127.0.0.1:3030/manage | head -5
 3. 自检：首页新闻窗口顶边与切到「搜索引擎」后卡片区顶边在同一水平线，两块高度一致。
 
 > 微调：水平位置改 `custom.css` 末尾 `body:not(.home-view) ... .nav-active` 的 `left` / `width`；垂直位置与高度由 `custom.js` 自动测量，不建议写死，兜底值在 CSS 的 `var()` 第二个参数里。
+
+
+## 6.5 v1.0.1：新闻部件改为百度热搜榜（2026-11-09）
+
+> ⚠️ **本节覆盖 6.2 节里关于「新闻来源」的全部内容。** v1.0.1 起该部件只显示百度热搜榜，不再聚合 RSS；6.2 节的来源筛选与多源配置仅适用于 v1.0.0 及更早镜像。
+
+**为什么要换**：v1.0.0 默认三个源都有硬伤——新浪系 RSS 停在 **2018-09-23**（新浪滚动更早到 2016-06），HTTP 仍是 200；百度 RSS 是低频「焦点精选」，实测 40+ 分钟首条不变，且每条 `pubDate` 都是**抓取时刻**，按时间倒序排会一直霸占「全部」前 8 条，表现为「时间很新、内容不换」。前端时间格式不带年份，把 2018 年的新闻显示成「09/23」。
+
+**现在**：服务端固定请求百度热搜官方接口 `https://top.baidu.com/api/board?platform=pc&tab=realtime`（裸请求 200，容器直连即可），解析出置顶 1 条 + 榜单 50 条：
+
+| 首屏元素 | 内容 |
+|---|---|
+| 徽标 | 置顶显示 `↑`；第 1/2/3 名红 / 橙 / 黄数字；其余沿用原有紫色徽标 |
+| 标题 | 热搜词，悬停显示摘要；点击新标签打开百度搜索结果页 |
+| 角标 | 「新 / 沸 / 热」（`hotTag` 1 / 2 / 3） |
+| 右侧 | 热度值，如 `780.8万` |
+| 工具栏 | 榜单名 + 「更新于 HH:mm」+ 手动刷新按钮 |
+
+服务端缓存 **60 秒**，前端默认 60 秒自动刷新；接口地址写死在代码里不可配置（避免 SSRF），链接只接受 http(s)，上游失败返回空列表 + `error` 标记并显示「热搜暂不可用，稍后会自动重试」。
+
+### 升级步骤（必须换镜像）
+
+1. 删掉 NAS 上的旧镜像 → 重拉 `boyu233/homepage-bookmark-manager:v1.0.1`（或 `:latest`）→ 重建项目 → 浏览器 **Ctrl+F5**。**只覆盖配置文件无效**，这是组件代码改动。
+2. `custom.js` / `custom.css` **不用动**：榜单复用原有 `.news-list` / `.news-source-badge` / `.news-item-time` 样式，排名与角标颜色走内联样式。`limit` 从 8 提到 10 会让窗口变高，`custom.js` 的 `ResizeObserver` 会自动重测，6.4 节的分组卡片区对齐仍有效。
+3. 建议把用户配置目录 `widgets.yaml` 的 `news` 段改成：
+
+    ```yaml
+    - news:
+        label: 百度热搜
+        limit: 10               # 1-50，含置顶 + 排名
+        refreshInterval: 60000
+        target: _blank
+    ```
+
+    不改也能跑，只是标题仍显示「实时新闻」、只铺 8 条、5 分钟才刷新一次。
+4. **删掉 compose 里的旧环境变量**：`HOMEPAGE_NEWS_SOURCES`、`HOMEPAGE_NEWS_FEEDS`（以及 `widgets.yaml` 里的 `news.url` / `news.showSourceFilter`）在 v1.0.1 里已完全失效。留着不会报错，但会让人误以为还在生效。改环境变量需要**重建容器**（停止 → 清除 → 构建），只重启不生效。
+
+### 自检
+
+- 页面：首行是 `↑` 置顶，其后是 1 / 2 / 3… 排名，右侧热度形如 `xxx.x万`，工具栏有「更新于」。
+- API：`http://<群晖地址>:<端口>/api/widgets/news?index=3` 应返回 `boardName: "热搜榜"`、`feedNames: ["百度热搜"]`、`sources: 1`，且 `items[0].isTop === true`、条目带 `rank` / `hotScore`。若 `feedNames` 仍是 `["百度新闻","新浪国内","IT之家"]`，说明**还是 v1.0.0 镜像**（删干净旧镜像重拉）。
+- 容器出网：`docker exec homepage wget -qO- 'https://top.baidu.com/api/board?platform=pc&tab=realtime' | head -c 120`，能看到 `{"success":true` 即正常。
+
+### 排错
+
+| 现象 | 原因 / 处理 |
+|---|---|
+| 仍是「09/23 新浪国内」 | 旧镜像，删镜像重拉 |
+| 仍是「实时新闻 + 来源标签」 | 旧镜像，或浏览器缓存 → Ctrl+F5 / 无痕窗口 |
+| 一直「正在获取热搜…」 | 容器不能出网 `top.baidu.com`（见上方 wget 自检）；检查代理 / DNS |
+| 「热搜暂不可用」 | 上游非 200 或结构改版，`docker logs homepage` 会有 `百度热搜获取失败: ...` |
+| 榜单不刷新 | 确认 `refreshInterval: 60000`；服务端缓存固定 60 秒，点刷新按钮可立即重拉 |
 
 ---
 
