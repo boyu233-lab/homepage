@@ -1,7 +1,7 @@
 # 启动前改 3 类 CHANGE_ME（密码 / secret / 访问地址）与 volumes 左侧路径
 services:
   homepage:
-    image: boyu233/homepage-bookmark-manager:latest
+    image: boyu233/homepage-bookmark-manager:v1.0.2
     container_name: homepage
     restart: unless-stopped
     ports:
