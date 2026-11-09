@@ -14,7 +14,7 @@
 | 模块 | 内容 |
 |---|---|
 | 数据源 | 改为百度热搜官方 JSON 接口 `top.baidu.com/api/board?platform=pc&tab=realtime`，服务端代理抓取；移除全部 RSS 源与并发聚合逻辑 |
-| 榜单展示 | 置顶条目（↑）+ 排名 1..50；前三名红/橙/黄徽标；右侧热度（如 `780.8万`）；「新 / 沸 / 热」角标；悬停显示摘要；工具栏显示榜单更新时间 |
+| 榜单展示 | 置顶条目（↑）+ 排名 1..49（服务端上限 50 条，`limit` 默认只显示前 10 条）；前三名红/橙/黄徽标；右侧热度（如 `780.8万`）；「新 / 沸 / 热」角标；悬停显示摘要；工具栏显示榜单更新时间 |
 | 更新频率 | 服务端缓存 60 秒（原 5 分钟），前端默认 60 秒自动刷新，手动刷新按钮保留 |
 | 来源筛选 | 移除（只有单一榜单），不再读写 `localStorage["homepage.newsSource"]` |
 | 安全 | 接口地址固定不可配置（避免 SSRF）；链接只接受 http(s)；标题/摘要由 React 转义；上游失败返回空列表 + 错误标记，不抛出 |
@@ -42,9 +42,10 @@
 
 ### 发布坐标
 
-- 镜像：`boyu233/homepage-bookmark-manager:v1.0.1` = `:latest` = `:sha-PENDING`
-- Digest：`PENDING`（构建推送后回填）
-- 代码：git tag `v1.0.1`，分支 `dev` / `feat/bookmark-manager`
+- 镜像：`boyu233/homepage-bookmark-manager:v1.0.1` = `:latest` = `:sha-390aaa3`
+- Digest：`sha256:678821c624cf4f572cceb7f5ca42c7964b31a993ff9f4299e5613338ee71616d`（`linux/amd64`，Registry API 核验三个标签一致）
+- 代码：commit `390aaa3`、git tag `v1.0.1`，分支 `dev` / `feat/bookmark-manager`
+- 离线镜像：`homepage-image-v1.0.1.tar`（`docker load` 导入）
 
 ---
 

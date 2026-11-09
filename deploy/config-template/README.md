@@ -5,6 +5,8 @@
 > **正常情况下不再需要手动上传本包**。本目录现用于：手动覆盖、自定义壁纸源 / 分组图标、排查时对照。
 > 升级做法：删掉 NAS 上的旧镜像 → 重新拉取 → 重建项目 → Ctrl+F5。
 >
+> 📌 **v1.0.1 起新闻部件已改为百度热搜榜**（只换镜像即可，不需要再传 `widgets.yaml`；如需改标题/条数见部署文档 6.5 节）。以下三部件说明是 v1.0.0 的历史记录。
+>
 > 📌 **但本次「多引擎搜索 / 时间 / 实时新闻」三个部件例外**：它们依赖新版镜像里的代码 + 新的 `widgets.yaml`。
 > 新版镜像已于 **2026-11-07 11:05** 推送 Docker Hub（`:latest` / `:sha-4d61e9b`，digest `sha256:58b2c52c…1ec2`）：删掉 NAS 旧镜像重拉即可，详见部署文档 **5-A**。
 > 已有部署的 `widgets.yaml` 是用户自己的非空文件，入口脚本不会覆盖，所以**必须手动上传一次本目录的 `widgets.yaml`**（见部署文档 6.2 节）。
@@ -27,7 +29,7 @@
 | `custom.js` | 左侧分组导航 + 右下角「在线壁纸」「换一张」按钮 |
 | `custom.css` | 极光背景、瓷砖卡片样式、导航排版 |
 | `settings.yaml` | 深色紫色主题、快捷搜索、关闭原生折叠 |
-| `widgets.yaml` | 顶部 CPU / 内存 / 磁盘 + **多引擎搜索（百度/Bing/Google/DuckDuckGo/Brave）+ 中文时间 + 实时新闻** |
+| `widgets.yaml` | 顶部 CPU / 内存 / 磁盘 + **多引擎搜索（百度/Bing/Google/DuckDuckGo/Brave）+ 中文时间 + 百度热搜榜** |
 | `services.yaml` | 空列表，清掉官方三个演示服务分组 |
 
 ⚠️ **不要上传或覆盖 `bookmarks.yaml`**。那里面是你自己的真实书签，本模板刻意不包含它。
@@ -72,7 +74,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 - 左侧导航最上方固定「首页」虚拟分组（小房子图标），首次访问默认进入；选中状态存 localStorage。
 - 首页视图（`body.home-view`）下，顶部信息条里的 **搜索框 → 中文时间 → 实时新闻** 上下居中堆叠；时间字号 `clamp(2rem, 4.4vw, 3.4rem)`、`font-weight: 800`；书签卡片隐藏，形成干净起始页。
-- 新闻**直接在首页铺开 8 条列表**（没有下拉浮层、不再轮播），每条含来源徽标 + 标题 + 时间；列表上方「全部 / 百度新闻 / …」标签可切换来源，选择记在浏览器 localStorage。
+- 新闻区（v1.0.1）**直接铺开百度热搜榜**：置顶 ↑ + 排名 1..、右侧热度、新/热角标；v1.0.0 的来源徽标 + 来源筛选标签已移除。
 - 切到其它书签分组时，时间与新闻自动隐藏，顶部只留资源信息与搜索框。
 - 切换分组后，右侧卡片区不再跳到页面顶部，而是与首页新闻窗口同起点、同高度（见部署文档 6.4 节）。
 - 左侧导航桌面/平板**任何屏宽都保持竖排**，且**固定在第一版面同一位置**：`.group-nav { position: absolute; top: clamp(180px, 36vh, 380px) }` + `.nav-layout { padding-left: 190px }` 保留占位。距顶部只跟视口高度有关，切换分组、新闻条数都不影响（见部署文档 6.3 节）；手机（≤560px）改为顶部横排标签条。
@@ -80,6 +82,6 @@ curl -i http://127.0.0.1:3030/manage | head -5
 > ⚠️ 常驻新闻列表与来源筛选属于**组件代码**，已有部署必须同时换镜像；只覆盖配置文件不会出现。
 > 导航固定位置属于 **custom.css 配置**：已有部署只需覆盖该文件并 Ctrl+F5（见 6.3 节）；镜像内 skeleton 已同步，全新部署开箱即带。
 > 点击分组后，右侧卡片区由 `custom.js` 测量新闻窗口后对齐到**同一起点、同一高度**（见 6.4 节）；这版升级包需同时覆盖 `custom.js` 与 `custom.css`。
-> 启用哪些源：compose 的 `environment` 加 `HOMEPAGE_NEWS_SOURCES: "baidu,ithome,sspai"`（可选 `baidu` / `sina` / `ithome` / `sspai` / `sina-tech`），或 `HOMEPAGE_NEWS_FEEDS` 写自定义 RSS，详见部署文档 6.2 节。
+> ⚠️ **v1.0.1 起 `HOMEPAGE_NEWS_SOURCES` / `HOMEPAGE_NEWS_FEEDS` / `news.url` 全部失效**，热搜接口固定写死在组件里，详见部署文档 6.5 节。
 
-调整入口：集中在 `custom.css` 末尾「首页视图」区块（字号、宽度、居中高度、新闻列表配色、是否显示书签）；默认视图在 `custom.js` 的 `activate(HOME_GROUP)`；部件顺序、`news.limit`、`news.showSourceFilter` 在 `widgets.yaml`。改完记得 Ctrl+F5，custom.js / custom.css 有浏览器缓存。
+调整入口：集中在 `custom.css` 末尾「首页视图」区块（字号、宽度、居中高度、新闻列表配色、是否显示书签）；默认视图在 `custom.js` 的 `activate(HOME_GROUP)`；部件顺序、`news.limit`（1-50）、`news.refreshInterval` 在 `widgets.yaml`。改完记得 Ctrl+F5，custom.js / custom.css 有浏览器缓存。

@@ -1,6 +1,6 @@
 # 群晖 Docker 部署方法（Homepage 书签管理版）
 
-> **版本 v1.0.1（2026-11-09）** — 新闻部件已从 RSS 聚合改为**百度热搜榜**，见 **6.5 节**；对应 git tag `v1.0.1`、镜像 `:v1.0.1` = `:latest` = `:sha-PENDING_SHA`、digest `PENDING_DIGEST`。上一版定版坐标见 `CHANGELOG.md` v1.0.0 条目，离线交付见 `homepage-release-v1.0.0/` 归档包。变更历史见仓库 `CHANGELOG.md`。
+> **版本 v1.0.1（2026-11-09）** — 新闻部件已从 RSS 聚合改为**百度热搜榜**，见 **6.5 节**；对应 git tag `v1.0.1`、镜像 `:v1.0.1` = `:latest` = `:sha-390aaa3`、digest `sha256:678821c624cf4f572cceb7f5ca42c7964b31a993ff9f4299e5613338ee71616d`。上一版定版坐标见 `CHANGELOG.md` v1.0.0 条目，离线交付见 `homepage-release-v1.0.0/` 归档包。变更历史见仓库 `CHANGELOG.md`。
 
 > 配套 YAML：[`synology-compose.yaml`](./synology-compose.yaml)
 > 适用：群晖 DSM 7.2+ / Container Manager，**x86_64 机型**（已发布的镜像是 `linux/amd64`）
@@ -129,6 +129,8 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 ### A. 直接拉取已发布镜像（推荐，当前可用）
 
+> ⚠️ **以下为 v1.0.0 的更新记录**；当前版本是 v1.0.1（新闻部件改为百度热搜榜），见顶部版本块与 **6.5 节**。
+>
 > ✅ **2026-11-07 12:44 更新完成**：在「多引擎搜索 / 中文时间 / 首页常驻新闻列表 + 来源筛选 + 左侧导航固定位置」基础上，镜像内置的 `custom.js` / `custom.css` 已更新为**分组卡片区与新闻窗口同起点、同高度**（切换分组内容区不跳动，见 6.4 节）。`:latest` 与 `:sha-91876c4` 两个标签已推送 Docker Hub。
 > 当前 digest：`sha256:a47d668b463b1cfc6d73056d26dd6bf27bd1bbc11f20121501ae2538116cfe16`（`linux/amd64`）。
 > - **升级已有部署**：① 用 `homepage-panel-align.zip` 覆盖配置目录里的 `custom.js` **和 `custom.css`**（**必做**，见 6.3 / 6.4 节；入口脚本不会覆盖你改过的配置文件）；② 需要一并更新镜像时，删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目。若还没做 6.2 节的三部件升级，也按 **6.2 节**覆盖 `widgets.yaml`。
@@ -142,7 +144,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 |---|---|
 | `boyu233/homepage-bookmark-manager:v1.0.1` | **当前定版标签**（2026-11-09，百度热搜榜，见 6.5 节），推荐部署时固定使用，避免 `latest` 漂移 |
 | `boyu233/homepage-bookmark-manager:latest` | 当前最新，配套 YAML 默认使用，与 `:v1.0.1` 同 digest |
-| `boyu233/homepage-bookmark-manager:sha-PENDING_SHA` | 当前固定版本（百度热搜榜 + 卡片区对齐 + 导航固定 + 脱敏定制配置），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:sha-390aaa3` | 当前固定版本（百度热搜榜 + 卡片区对齐 + 导航固定 + 脱敏定制配置），回滚 / 复现用 |
 | `boyu233/homepage-bookmark-manager:v1.0.0` | 上一版定版（2026-11-07，RSS 新闻聚合），需要回退旧行为时用 |
 | `boyu233/homepage-bookmark-manager:sha-91876c4` | v1.0.0 对应的固定版本 |
 | `boyu233/homepage-bookmark-manager:sha-2b2a4c3` | 上一版（导航固定，但卡片区仍会跳到页面顶部），需要回退时用 |
@@ -151,7 +153,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`PENDING_DIGEST`（`latest` / `v1.0.1` / `sha-PENDING_SHA` 指向同一镜像）。
+- 当前镜像 digest：`sha256:678821c624cf4f572cceb7f5ca42c7964b31a993ff9f4299e5613338ee71616d`（`latest` / `v1.0.1` / `sha-390aaa3` 指向同一镜像）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
 **以后要更新镜像**：在 fork 的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`（Docker Hub **Access Token**，Read/Write 权限，不是登录密码），再在 **Actions** 手动运行 `Build & Push Docker image (fork)`，或推一个 `v*` tag 自动触发；也可以在本机执行 `deploy/build-and-push.sh`。官方 workflow 带 `if: github.repository == 'gethomepage/homepage'`，在 fork 里不会执行，所以本仓库自带这个 fork 专用 workflow。
@@ -316,7 +318,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 **为什么要换**：v1.0.0 默认三个源都有硬伤——新浪系 RSS 停在 **2018-09-23**（新浪滚动更早到 2016-06），HTTP 仍是 200；百度 RSS 是低频「焦点精选」，实测 40+ 分钟首条不变，且每条 `pubDate` 都是**抓取时刻**，按时间倒序排会一直霸占「全部」前 8 条，表现为「时间很新、内容不换」。前端时间格式不带年份，把 2018 年的新闻显示成「09/23」。
 
-**现在**：服务端固定请求百度热搜官方接口 `https://top.baidu.com/api/board?platform=pc&tab=realtime`（裸请求 200，容器直连即可），解析出置顶 1 条 + 榜单 50 条：
+**现在**：服务端固定请求百度热搜官方接口 `https://top.baidu.com/api/board?platform=pc&tab=realtime`（裸请求 200，容器直连即可），解析出置顶 1 条 + 榜单前 49 名（服务端上限 50 条，首屏按 `limit` 显示前 10 条）：
 
 | 首屏元素 | 内容 |
 |---|---|
@@ -460,7 +462,7 @@ Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp [2a
    docker images --digests | grep homepage-bookmark-manager
    ```
 
-   确认 digest 是 `sha256:58b2c52c4498…1ec2`（见第 5 节 A）再回第 6 节重建项目。若仍是 `4a78326d…`，说明加速源还在缓存上一版，等同步或改用 5-C 的 tar 导入。
+   确认 digest 是 `sha256:678821c624c…ee71616d`（见第 5 节 A）再回第 6 节重建项目。若仍是 `4a78326d…`，说明加速源还在缓存上一版，等同步或改用 5-C 的 tar 导入。
 
 > 加速站是第三方服务，随时可能失效。备用源 `https://hub.rat.dev`（同样实测 `docker pull` 成功）。`/v2/` 返回 401 是正常的鉴权挑战，不代表不可用；**换源前用 `docker pull <源域名>/boyu233/homepage-bookmark-manager:latest` 实测一次**再改配置。
 
