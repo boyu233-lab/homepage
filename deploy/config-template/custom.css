@@ -954,7 +954,30 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
   line-height: 1.8;
 }
 
-/* 播放视图:播放器在上、歌单常驻在下,两栏高度保持稳定 */
+/* 选集视图：返回搜索结果 + 当前合集标题（一个视频里的所有分P） */
+.bili-playlist-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 9px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: rgba(28, 22, 55, 0.42);
+  font-size: 0.76rem;
+}
+
+.bili-playlist-bar .bili-back {
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
+.bili-playlist-bar .bili-open {
+  width: auto;
+  padding: 0;
+}
+
+/* 播放视图:播放器在上、选集歌单常驻在下,面板高度保持稳定 */
 .bili-player {
   width: 100%;
   margin-bottom: 10px;

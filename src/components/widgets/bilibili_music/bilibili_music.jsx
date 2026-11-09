@@ -1,6 +1,7 @@
 import classNames from "classnames";
 import { useSyncExternalStore, useState } from "react";
 import {
+  FiArrowLeft,
   FiChevronLeft,
   FiChevronRight,
   FiExternalLink,
@@ -15,12 +16,16 @@ import Container from "../widget/container";
 import Raw from "../widget/raw";
 
 // 历史命名：v1.0.2 这里是音乐区排行榜，v1.0.3 起改为「搜索 → 手动选播 → 纯音频播放」。
-// 组件路径 / widget key 不变，避免已有部署只换镜像时出现 Missing bilibili_music。
+// v1.0.5 起歌单改为「所选视频的视频选集」：B站一个合集视频里可能有一百多个分P，
+// 每个分P有自己的 cid 与曲名，搜索结果只是「视频」而不是「歌」。
 // 音频走同源服务端代理（B站 CDN 强制校验 Referer），页面里只有 <audio>，不显示任何视频画面。
+const SEARCH_API = "/api/widgets/bilibili_music";
+const PAGES_API = "/api/widgets/bilibili_pages";
 const AUDIO_API = "/api/widgets/bilibili_audio";
 const DEFAULT_REFRESH_MS = 10 * 60 * 1000; // 同一关键词搜索结果缓存 10 分钟
 const MAX_QUERY_LENGTH = 60;
 const MAX_PAGE = 10;
+const PAGE_SIZE = 20; // 选集每页显示 20 首，避免上百个分P一次性铺开
 const RECENT_KEY = "homepage.bilibiliRecent";
 const VOLUME_KEY = "homepage.bilibiliVolume";
 const MUTED_KEY = "homepage.bilibiliMuted";
@@ -93,12 +98,12 @@ function saveRecent(query) {
   }
 }
 
-function audioSrc(bvid) {
-  return `${AUDIO_API}?bvid=${encodeURIComponent(bvid)}`;
+function audioSrc(bvid, cid) {
+  return `${AUDIO_API}?bvid=${encodeURIComponent(bvid)}&cid=${encodeURIComponent(cid)}`;
 }
 
 /* ============ 音量锁定 ============
-   原生 <audio> 每首歌都会重新挂载(key=bvid),音量默认是 100%。
+   原生 <audio> 每首歌都会重新挂载(key=bvid:cid),音量默认是 100%。
    用户手动调整一次后把音量/静音状态记到 localStorage,之后每次挂载与开始播放
    都自动应用该值 —— 调一次即锁定,切歌、自动下一首、刷新页面都不会回弹。 */
 function readAudioPrefs() {
@@ -143,30 +148,52 @@ export default function BilibiliMusic({ options }) {
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [playing, setPlaying] = useState(null);
+  const [selection, setSelection] = useState(null); // 当前打开选集的视频
+  const [playlistPage, setPlaylistPage] = useState(1);
+  const [playingPage, setPlayingPage] = useState(null); // null = 默认从选集第 1 首开始
+  const [stopped, setStopped] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const recent = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  // 未搜索时 key 为 null：SWR 不会请求上游，右侧保持干净的搜索起始态
-  const key = query
-    ? `/api/widgets/bilibili_music?${new URLSearchParams({
+  const searchKey = query
+    ? `${SEARCH_API}?${new URLSearchParams({
         index: String(index ?? 0),
         q: query,
         page: String(page),
         refreshInterval: String(refreshMs),
       })}`
     : null;
+  const pagesKey = selection
+    ? `${PAGES_API}?${new URLSearchParams({ index: String(index ?? 0), bvid: selection.bvid })}`
+    : null;
+  const swrOptions = { revalidateOnFocus: false, revalidateOnReconnect: false };
+  const search = useSWR(searchKey, swrOptions);
+  const playlist = useSWR(pagesKey, swrOptions);
 
-  const { data, error, isValidating, mutate } = useSWR(key, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-  });
-
+  // 搜索视图：搜索结果只是「视频」，点击后进入该视频的选集
   const maxItems = Math.min(20, Math.max(1, Number(limit) || 10));
-  const items = query && Array.isArray(data?.items) ? data.items : [];
-  const visible = items.slice(0, maxItems);
-  const currentIndex = visible.findIndex((item) => item.bvid === playing);
-  const current = currentIndex >= 0 ? visible[currentIndex] : null;
+  const searchItems = query && Array.isArray(search.data?.items) ? search.data.items : [];
+  const searchVisible = searchItems.slice(0, maxItems);
+
+  // 选集视图：一个视频的 N 个分P，每首有独立 cid / 曲名 / 时长
+  const playlistReady = selection && playlist.data?.bvid === selection.bvid && Array.isArray(playlist.data?.items);
+  const pages = playlistReady ? playlist.data.items : [];
+  const playlistTitle = playlistReady ? playlist.data.title || selection.title : selection?.title;
+  const totalPlaylistPages = Math.max(1, Math.ceil(pages.length / PAGE_SIZE));
+  const activePlaylistPage = Math.min(playlistPage, totalPlaylistPages);
+  const visiblePages = pages.slice((activePlaylistPage - 1) * PAGE_SIZE, activePlaylistPage * PAGE_SIZE);
+
+  const activePage = playingPage ?? 1;
+  const foundIndex = pages.findIndex((entry) => entry.page === activePage);
+  const currentIndex = foundIndex >= 0 ? foundIndex : pages.length ? 0 : -1;
+  const current = !stopped && selection && currentIndex >= 0 ? pages[currentIndex] : null;
+
+  const resetPlayback = () => {
+    setPlayingPage(null);
+    setPlaylistPage(1);
+    setStopped(false);
+    setAudioError(false);
+  };
 
   const runSearch = (text) => {
     const cleaned = String(text ?? "")
@@ -177,8 +204,8 @@ export default function BilibiliMusic({ options }) {
     setDraft(cleaned);
     setQuery(cleaned);
     setPage(1);
-    setPlaying(null);
-    setAudioError(false);
+    setSelection(null);
+    resetPlayback();
     saveRecent(cleaned);
   };
 
@@ -187,34 +214,87 @@ export default function BilibiliMusic({ options }) {
     runSearch(draft);
   };
 
-  const play = (bvid) => {
-    setAudioError(false);
-    setPlaying(bvid);
+  const openSelection = (item) => {
+    setSelection({ bvid: item.bvid, title: item.title, author: item.author, link: item.link });
+    resetPlayback();
   };
 
+  const backToSearch = () => {
+    setSelection(null);
+    resetPlayback();
+  };
+
+  const playPage = (pageNumber) => {
+    setPlayingPage(pageNumber);
+    setStopped(false);
+    setAudioError(false);
+  };
+
+  // 上一个 / 下一个 / 播完自动切下一首，都在同一视频的分P之间移动
   const shift = (delta) => {
-    if (currentIndex < 0 || !visible.length) return;
-    const next = (currentIndex + delta + visible.length) % visible.length;
-    play(visible[next].bvid);
+    if (!pages.length || currentIndex < 0) return;
+    const next = (currentIndex + delta + pages.length) % pages.length;
+    setPlayingPage(pages[next].page);
+    setPlaylistPage(Math.floor(next / PAGE_SIZE) + 1);
+    setStopped(false);
+    setAudioError(false);
   };
 
   const changePage = (delta) => {
-    setPlaying(null);
-    setAudioError(false);
     setPage((currentPage) => Math.min(MAX_PAGE, Math.max(1, currentPage + delta)));
   };
 
-  // 手动刷新带 force=1：跳过服务端 10 分钟缓存，立即重拉上游
+  const changePlaylistPage = (delta) => {
+    setPlaylistPage((currentPlaylistPage) =>
+      Math.min(totalPlaylistPages, Math.max(1, currentPlaylistPage + delta)),
+    );
+  };
+
+  // 手动刷新带 force=1：搜索跳过服务端 10 分钟缓存；选集跳过 24 小时缓存
   const refresh = () => {
-    if (!key) return;
-    mutate(fetch(`${key}&force=1`).then((response) => response.json()), { revalidate: false });
+    if (pagesKey) {
+      playlist.mutate(fetch(`${pagesKey}&force=1`).then((response) => response.json()), { revalidate: false });
+    } else if (searchKey) {
+      search.mutate(fetch(`${searchKey}&force=1`).then((response) => response.json()), { revalidate: false });
+    }
   };
 
   let emptyText = "";
-  if (!query) emptyText = "输入关键词搜索 B站视频，点击结果即可在此播放";
-  else if (error || data?.error) emptyText = "搜索暂不可用，稍后重试";
-  else if (isValidating && !visible.length) emptyText = "正在搜索 B站视频…";
-  else if (!visible.length) emptyText = "没有找到相关视频，换个关键词试试";
+  if (selection) {
+    if (playlist.error || playlist.data?.error) emptyText = "选集读取失败，稍后重试";
+    else if (playlist.isValidating && !pages.length) emptyText = "正在读取视频选集…";
+    else if (!pages.length) emptyText = "该视频没有可用选集";
+  } else if (!query) emptyText = "输入关键词搜索 B站视频，点开结果即可查看选集并播放";
+  else if (search.error || search.data?.error) emptyText = "搜索暂不可用，稍后重试";
+  else if (search.isValidating && !searchVisible.length) emptyText = "正在搜索 B站视频…";
+  else if (!searchVisible.length) emptyText = "没有找到相关视频，换个关键词试试";
+
+  // 两种视图共用同一套列表样式：搜索结果是「视频」，选集是「分P歌曲」
+  const rows = selection
+    ? visiblePages.map((entry) => ({
+        key: `${selection.bvid}:${entry.cid}`,
+        rank: entry.page,
+        title: entry.part,
+        meta: formatDuration(entry.duration),
+        link: entry.link || selection.link,
+        active: entry.page === activePage,
+        label: `播放 ${entry.part}`,
+        hint: `${playlistTitle} · 第 ${entry.page} 首 · ${formatDuration(entry.duration)}`,
+        onClick: () => playPage(entry.page),
+      }))
+    : searchVisible.map((item) => ({
+        key: item.bvid,
+        rank: item.rank,
+        title: item.title,
+        meta: `${formatCount(item.view)} · ${formatDuration(item.duration)}`,
+        link: item.link,
+        active: false,
+        label: `打开选集 ${item.title}`,
+        hint: `${item.title} · ${item.author} · ${formatCount(item.view)} 播放 · ${formatDuration(item.duration)}`,
+        onClick: () => openSelection(item),
+      }));
+
+  const isValidating = selection ? playlist.isValidating : search.isValidating;
 
   return (
     <Container options={options} additionalClassNames="information-widget-bilibili_music">
@@ -223,17 +303,24 @@ export default function BilibiliMusic({ options }) {
           <div className="bili-toolbar">
             <FiSearch className="bili-toolbar-icon w-4 h-4" aria-hidden="true" />
             <span className="bili-label">{label}</span>
-            {query && data?.updatedAt && (
+            {selection ? (
               <span className="bili-item-meta">
-                第 {page} 页 · 更新于 {formatUpdateTime(data.updatedAt)}
+                选集 {pages.length ? `${pages.length} 首` : ""} · 第 {activePlaylistPage} / {totalPlaylistPages} 页
               </span>
+            ) : (
+              query &&
+              search.data?.updatedAt && (
+                <span className="bili-item-meta">
+                  第 {page} 页 · 更新于 {formatUpdateTime(search.data.updatedAt)}
+                </span>
+              )
             )}
             <button
               type="button"
               onClick={refresh}
-              disabled={!query}
-              title="重新搜索"
-              aria-label="重新搜索"
+              disabled={!query && !selection}
+              title="刷新"
+              aria-label="刷新"
               className="bili-refresh"
             >
               <FiRefreshCw className={classNames("w-3.5 h-3.5", isValidating && "animate-spin")} />
@@ -246,7 +333,7 @@ export default function BilibiliMusic({ options }) {
               type="search"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="搜索 B站视频 / 音乐 / UP主…"
+              placeholder="搜索 B站视频 / 音乐 / 合集…"
               aria-label="搜索关键词"
               maxLength={MAX_QUERY_LENGTH}
             />
@@ -255,7 +342,7 @@ export default function BilibiliMusic({ options }) {
             </button>
           </form>
 
-          {!query && recent.length > 0 && (
+          {!query && !selection && recent.length > 0 && (
             <div className="bili-recent">
               <span className="bili-recent-label">最近搜索</span>
               {recent.map((entry) => (
@@ -266,7 +353,7 @@ export default function BilibiliMusic({ options }) {
             </div>
           )}
 
-          {!query && (
+          {!query && !selection && (
             <div className="bili-suggest">
               <span>试试：</span>
               {["周杰伦", "纯音乐", "白噪音", "Lo-Fi"].map((entry) => (
@@ -277,32 +364,57 @@ export default function BilibiliMusic({ options }) {
             </div>
           )}
 
+          {selection && (
+            <div className="bili-playlist-bar">
+              <button
+                type="button"
+                className="bili-back"
+                onClick={backToSearch}
+                aria-label="返回搜索结果"
+                title="返回搜索结果"
+              >
+                <FiArrowLeft className="w-3 h-3" aria-hidden="true" />
+                <span>搜索结果</span>
+              </button>
+              <span className="bili-now-title" title={playlistTitle}>
+                {playlistTitle}
+              </span>
+              <a
+                href={selection.link}
+                target={target}
+                rel="noreferrer"
+                className="bili-open"
+                aria-label="在 B站打开该视频"
+                title="在 B站打开该视频"
+              >
+                <FiExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+              </a>
+            </div>
+          )}
+
           {current && (
             <div className="bili-player bili-audio-player">
               <div className="bili-player-bar">
                 <button
                   type="button"
                   className="bili-back"
-                  onClick={() => {
-                    setPlaying(null);
-                    setAudioError(false);
-                  }}
+                  onClick={() => setStopped(true)}
                   aria-label="停止播放"
                   title="停止播放"
                 >
                   <FiX className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>停止</span>
                 </button>
-                <span className="bili-now-title" title={current.title}>
-                  {current.title}
+                <span className="bili-now-title" title={current.part}>
+                  {current.part}
                 </span>
                 <a
-                  href={current.link}
+                  href={current.link || selection.link}
                   target={target}
                   rel="noreferrer"
                   className="bili-open"
-                  aria-label="在 B站打开当前视频"
-                  title="在 B站打开当前视频"
+                  aria-label="在 B站打开当前分P"
+                  title="在 B站打开当前分P"
                 >
                   <FiExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                 </a>
@@ -314,18 +426,18 @@ export default function BilibiliMusic({ options }) {
                   <FiMusic className="w-6 h-6" />
                 </span>
                 <span className="bili-audio-info">
-                  <span className="bili-audio-title">{current.title}</span>
+                  <span className="bili-audio-title">{current.part}</span>
                   <span className="bili-item-meta">
-                    {current.author} · {formatDuration(current.duration)} · 仅音频播放
+                    {playlistTitle} · {formatDuration(current.duration)} · 仅音频播放
                   </span>
                 </span>
               </div>
 
               <audio
-                key={current.bvid}
+                key={`${selection.bvid}:${current.cid}`}
                 ref={lockAudioVolume}
                 className="bili-audio-el"
-                src={audioSrc(current.bvid)}
+                src={audioSrc(selection.bvid, current.cid)}
                 controls
                 autoPlay
                 preload="metadata"
@@ -338,7 +450,7 @@ export default function BilibiliMusic({ options }) {
               </audio>
 
               {audioError && (
-                <div className="bili-audio-error">音频加载失败：该视频可能没有音轨，或 B站暂时拒绝了请求</div>
+                <div className="bili-audio-error">音频加载失败：该分P可能没有音轨，或 B站暂时拒绝了请求</div>
               )}
 
               <div className="bili-player-controls">
@@ -346,7 +458,7 @@ export default function BilibiliMusic({ options }) {
                   <FiChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </button>
                 <span className="bili-item-meta">
-                  {currentIndex + 1} / {visible.length} · {current.author}
+                  {activePage} / {pages.length} · {selection.author}
                 </span>
                 <button type="button" onClick={() => shift(1)} aria-label="下一个" title="下一个">
                   <FiChevronRight className="w-4 h-4" aria-hidden="true" />
@@ -355,36 +467,31 @@ export default function BilibiliMusic({ options }) {
             </div>
           )}
 
-          {/* 歌单常驻：点选播放后仍完整显示，当前曲目高亮，可直接点其它条目切歌 */}
-          <ul className={classNames("bili-list", current && "bili-list-scrollable")}>
+          {/* 歌单常驻：播放时选集完整显示，当前分P高亮，点任意一首即可切歌 */}
+          <ul className={classNames("bili-list", (selection || current) && "bili-list-scrollable")}>
             {emptyText && (
-              <li className={classNames("bili-empty", !query && "bili-empty-start")}>{emptyText}</li>
+              <li className={classNames("bili-empty", !query && !selection && "bili-empty-start")}>{emptyText}</li>
             )}
-            {visible.map((item) => (
-              <li
-                key={item.bvid}
-                className={classNames("bili-list-item", item.bvid === playing && "bili-list-item-playing")}
-              >
+            {rows.map((row) => (
+              <li key={row.key} className={classNames("bili-list-item", row.active && "bili-list-item-playing")}>
                 <button
                   type="button"
                   className="bili-play-btn"
-                  onClick={() => play(item.bvid)}
-                  aria-label={`播放 ${item.title}`}
-                  aria-current={item.bvid === playing ? "true" : undefined}
-                  title={`${item.title} · ${item.author} · ${formatCount(item.view)} 播放 · ${formatDuration(item.duration)}`}
+                  onClick={row.onClick}
+                  aria-label={row.label}
+                  aria-current={row.active ? "true" : undefined}
+                  title={row.hint}
                 >
-                  <span className="bili-rank">{item.rank}</span>
-                  <span className="bili-item-title">{item.title}</span>
-                  <span className="bili-item-meta">
-                    {formatCount(item.view)} · {formatDuration(item.duration)}
-                  </span>
+                  <span className="bili-rank">{row.rank}</span>
+                  <span className="bili-item-title">{row.title}</span>
+                  <span className="bili-item-meta">{row.meta}</span>
                 </button>
                 <a
-                  href={item.link}
+                  href={row.link}
                   target={target}
                   rel="noreferrer"
                   className="bili-open"
-                  aria-label={`在 B站打开 ${item.title}`}
+                  aria-label={`在 B站打开 ${row.title}`}
                   title="在 B站打开"
                 >
                   <FiExternalLink className="w-3 h-3" aria-hidden="true" />
@@ -393,27 +500,52 @@ export default function BilibiliMusic({ options }) {
             ))}
           </ul>
 
-          {query && visible.length > 0 && (
-            <div className="bili-pager">
-              <button
-                type="button"
-                onClick={() => changePage(-1)}
-                disabled={page <= 1}
-                aria-label="上一页"
-              >
-                <FiChevronLeft className="w-3 h-3" aria-hidden="true" /> 上一页
-              </button>
-              <span className="bili-item-meta">第 {page} 页</span>
-              <button
-                type="button"
-                onClick={() => changePage(1)}
-                disabled={page >= MAX_PAGE}
-                aria-label="下一页"
-              >
-                下一页 <FiChevronRight className="w-3 h-3" aria-hidden="true" />
-              </button>
-            </div>
-          )}
+          {selection
+            ? pages.length > PAGE_SIZE && (
+                <div className="bili-pager">
+                  <button
+                    type="button"
+                    onClick={() => changePlaylistPage(-1)}
+                    disabled={activePlaylistPage <= 1}
+                    aria-label="上一页"
+                  >
+                    <FiChevronLeft className="w-3 h-3" aria-hidden="true" /> 上一页
+                  </button>
+                  <span className="bili-item-meta">
+                    第 {activePlaylistPage} / {totalPlaylistPages} 页 · 共 {pages.length} 首
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => changePlaylistPage(1)}
+                    disabled={activePlaylistPage >= totalPlaylistPages}
+                    aria-label="下一页"
+                  >
+                    下一页 <FiChevronRight className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                </div>
+              )
+            : query &&
+              searchVisible.length > 0 && (
+                <div className="bili-pager">
+                  <button
+                    type="button"
+                    onClick={() => changePage(-1)}
+                    disabled={page <= 1}
+                    aria-label="上一页"
+                  >
+                    <FiChevronLeft className="w-3 h-3" aria-hidden="true" /> 上一页
+                  </button>
+                  <span className="bili-item-meta">第 {page} 页</span>
+                  <button
+                    type="button"
+                    onClick={() => changePage(1)}
+                    disabled={page >= MAX_PAGE}
+                    aria-label="下一页"
+                  >
+                    下一页 <FiChevronRight className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
         </div>
       </Raw>
     </Container>

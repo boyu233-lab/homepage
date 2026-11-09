@@ -38,12 +38,14 @@
 
 - bilibili_music:
     label: B站音乐
-    limit: 10                    # 每页展示的搜索结果条数（1-20）
+    limit: 10                    # 每页展示的搜索结果条数（1-20）；选集固定每页 20 首
     refreshInterval: 600000      # 同一关键词的搜索结果缓存 10 分钟
     target: _blank
 
     # v1.0.3 起：输入关键词搜索 B站视频 → 手动点选 → 只播放声音、不显示画面。
-    # 搜索由服务端固定代理 api.bilibili.com/x/web-interface/wbi/search/type（免登录）；
-    # 音轨经同源 /api/widgets/bilibili_audio 转发（B站 CDN 强制校验 Referer，浏览器无法直连）。
+    # v1.0.5 起：点开视频后歌单显示该视频的「视频选集」（每个分P是一首），按 cid 逐首播放。
+    # 搜索固定代理 api.bilibili.com/x/web-interface/wbi/search/type，选集固定代理
+    # wbi/view 的 data.pages（免登录）；音轨经同源 /api/widgets/bilibili_audio?bvid=&cid=
+    # 转发（B站 CDN 强制校验 Referer，浏览器无法直连）。
     # 上游地址与 CDN 域名白名单写死在镜像代码里，不可配置，避免 SSRF。
     # 注：key 沿用 bilibili_music 是历史命名，实际功能已不是音乐区排行榜。

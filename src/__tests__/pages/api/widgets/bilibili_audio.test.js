@@ -9,6 +9,19 @@ vi.mock("utils/logger", () => ({ default: () => loggerMock }));
 
 const BVID = "BV1BZbSzZEGT";
 const VIEW_OK = { code: 0, data: { cid: 31268997329 } };
+const VIEW_PAGES = {
+  code: 0,
+  data: {
+    title: "120首纯音乐合集",
+    owner: { name: "北流嘉措" },
+    cid: 41105096717,
+    duration: 600,
+    pages: [
+      { page: 1, cid: 41105096717, part: "01.晚星", duration: 194 },
+      { page: 2, cid: 41105097363, part: "02.夏恋", duration: 267 },
+    ],
+  },
+};
 const PLAY_OK = {
   code: 0,
   data: {
@@ -194,5 +207,42 @@ describe("pages/api/widgets/bilibili_audio — B站纯音频代理", () => {
     await mod.resolveCid(BVID);
     await mod.resolveAudioUrls(BVID, cid);
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("v1.0.5：带 cid 时按选集里的指定分P取音轨", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(VIEW_PAGES))
+      .mockResolvedValueOnce(jsonResponse(PLAY_OK))
+      .mockResolvedValueOnce(streamResponse());
+    const res = await call({ bvid: BVID, cid: "41105097363" });
+    expect(global.fetch.mock.calls[1][0]).toContain("cid=41105097363");
+    expect(res.statusCode).toBe(206);
+    expect(res.headers["content-type"]).toBe("audio/mp4");
+  });
+
+  it("cid 不属于该视频的分P时返回 400，不向 CDN 取流", async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce(jsonResponse(VIEW_PAGES));
+    const res = await call({ bvid: BVID, cid: "99999999" });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.payload.error).toBe("invalid cid");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("cid 格式非法直接 400，完全不请求上游", async () => {
+    const res = await call({ bvid: BVID, cid: "javascript:1" });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("parseCid 只接受正整数字符串，未传时返回 undefined（兼容旧的第一分P）", async () => {
+    const { parseCid } = await loadModule();
+    expect(parseCid(undefined)).toBeUndefined();
+    expect(parseCid("")).toBeUndefined();
+    expect(parseCid("41105097363")).toBe(41105097363);
+    expect(parseCid(["41105097363"])).toBe(41105097363);
+    expect(parseCid("-1")).toBeNull();
+    expect(parseCid("1.5")).toBeNull();
+    expect(parseCid("abc")).toBeNull();
   });
 });
