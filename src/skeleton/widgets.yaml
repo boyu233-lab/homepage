@@ -1,8 +1,8 @@
 # Homepage - 顶部信息部件（脱敏默认配置）
 # 左侧「首页」分组的布局由 custom.js + custom.css 接管：
-#   搜索框 → 大号加粗时间 → [多源热搜 | B站音乐搜索] 左右并排（窄屏上下堆叠）。
+#   搜索框 → 大号加粗时间 → 多源热搜 → B站音乐搜索，上下堆叠、各占满整行。
 # 切到其它书签分组时，时间/热搜/音乐部件自动隐藏，顶部只留资源信息与搜索框。
-# 注意：search / datetime 必须排在前两位；news 与 bilibili_music 决定左右两栏顺序，不要随意调换。
+# 注意：search / datetime 必须排在前两位；news 与 bilibili_music 决定上下顺序，不要随意调换。
 
 - resources:
     cpu: true

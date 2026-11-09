@@ -433,8 +433,16 @@ input[placeholder*="搜索"]:focus {
 
 /* ============ 首页视图:搜索框 / 大时间 / 双栏面板 ============
    由 custom.js 在选中「首页」时给 body 加 .home-view。
-   DOM 节点保持 React 原样,只改排布:搜索与时间跨整行,
-   左侧多源热搜、右侧 B站搜索播放各占一列,窄屏回落为上下堆叠。 */
+   DOM 节点保持 React 原样,只改排布:搜索 → 时间 → 多源热搜 → B站搜索播放
+   依次向下单列堆叠(热搜在上、音乐在下),每块都占满整行宽度。
+
+   ⚠ 关键:上游 index.jsx 的 rightAlignedWidgets 只含 search/datetime/news,
+   bilibili_music 其实是 #widgets-wrap 的直接子节点,并不在 #information-widgets-right 里。
+   旧版把 #widgets-wrap 的所有非右栏子节点绝对定位到左上角,
+   结果 B站搜索框被缩小、半透明地钉在页面顶部(音乐窗口位置不对)。
+   这里把 #information-widgets-right 设为 display:contents(容器不生成盒子),
+   让两栏的部件统一成为 #widgets-wrap 网格的项,再用 order 固定顺序。
+   这样 B站部件挂在左栏还是右栏,排布结果都一致。 */
 
 /* 非首页分组:时间、热搜、B站搜索不显示,顶部信息条只留资源与搜索框 */
 body:not(.home-view) .information-widget-datetime,
@@ -447,15 +455,27 @@ body.home-view #information-widgets {
   position: relative;
 }
 
+/* 单列网格直接放在 #widgets-wrap 上,四块部件按 order 依次向下 */
 body.home-view #widgets-wrap {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  width: min(1240px, 96%) !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 30px 0 12px;
+  gap: 22px;
+  align-items: start;
+  justify-items: stretch;
 }
 
-/* 资源部件缩小固定在左上角,不挤占中间的居中区域 */
+/* 右栏容器打平:内部部件直接成为外层网格项 */
+body.home-view #information-widgets-right {
+  display: contents !important;
+}
+
+/* 资源部件缩小固定在左上角;B站音乐必须排除,否则又会被钉到顶部 */
 body.home-view #widgets-wrap > .information-widget-resources,
-body.home-view #widgets-wrap > div:not(#information-widgets-right) {
+body.home-view #widgets-wrap > div:not(#information-widgets-right):not(.information-widget-bilibili_music) {
   position: absolute;
   top: 8px;
   left: 4px;
@@ -464,26 +484,11 @@ body.home-view #widgets-wrap > div:not(#information-widgets-right) {
   transform-origin: top left;
 }
 
-/* 改成两列网格:搜索框与时间跨整行,热搜 / B站搜索各占一列 */
-body.home-view #information-widgets-right {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  width: min(1240px, 96%) !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: 30px 0 12px;
-  gap: 22px;
-  align-items: start;
-  justify-items: stretch;
-}
-
-body.home-view .information-widget-search,
-body.home-view .information-widget-datetime {
-  grid-column: 1 / -1;
-}
-
 /* ① 搜索框居中(grow 会让它在纵向被拉伸,这里一并关掉) */
 body.home-view .information-widget-search {
+  order: 1;
+  grid-column: 1 / -1;
+  justify-self: center;
   width: min(560px, 92%) !important;
   max-width: none !important;
   flex-grow: 0 !important;
@@ -493,6 +498,8 @@ body.home-view .information-widget-search {
 
 /* ② 时间:搜索框下方,左右居中,字号加大加粗 */
 body.home-view .information-widget-datetime {
+  order: 2;
+  grid-column: 1 / -1;
   width: 100% !important;
   text-align: center;
 }
@@ -509,7 +516,18 @@ body.home-view .information-widget-datetime span {
   text-shadow: 0 3px 22px rgba(124, 58, 237, 0.5);
 }
 
-/* ③ 热搜 + B站搜索:时间下方左右并排,整份列表直接铺开(无下拉浮层) */
+/* ③ 热搜 + B站搜索:时间下方上下排列,每块占满整行(无下拉浮层)
+   order 固定网格顺序,否则挂在左栏的 B站部件会被自动排到第一行、盖住搜索框 */
+body.home-view .information-widget-news {
+  order: 3;
+  grid-column: 1 / -1;
+}
+
+body.home-view .information-widget-bilibili_music {
+  order: 4;
+  grid-column: 1 / -1;
+}
+
 body.home-view .information-widget-news,
 body.home-view .information-widget-bilibili_music {
   width: 100% !important;
@@ -828,6 +846,14 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
   width: 100%;
 }
 
+/* 播放时歌单常驻：限高滚动，避免右栏被曲目列表拉得过高 */
+.bili-list-scrollable {
+  max-height: 245px;
+  overflow-y: auto;
+  padding-right: 3px;
+  scrollbar-width: thin;
+}
+
 .bili-list-item + .bili-list-item {
   margin-top: 5px;
 }
@@ -845,6 +871,17 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
 .bili-list-item:hover {
   background: rgba(124, 58, 237, 0.28);
   border-color: rgba(167, 139, 250, 0.4);
+}
+
+/* 当前正在播放的曲目 */
+.bili-list-item-playing {
+  border-color: rgba(196, 181, 253, 0.7) !important;
+  background: rgba(124, 58, 237, 0.34) !important;
+}
+
+.bili-list-item-playing .bili-rank {
+  background: rgba(124, 58, 237, 0.85);
+  color: #fff;
 }
 
 .bili-play-btn {
@@ -917,9 +954,12 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
   line-height: 1.8;
 }
 
-/* 播放视图:替换搜索结果(不叠加),两栏高度保持稳定 */
+/* 播放视图:播放器在上、歌单常驻在下,两栏高度保持稳定 */
 .bili-player {
   width: 100%;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed rgba(167, 139, 250, 0.28);
 }
 
 .bili-player-bar {
@@ -1048,11 +1088,12 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
 
 /* 窄屏:双栏回落为单栏上下堆叠 */
 @media (max-width: 900px) {
-  body.home-view #information-widgets-right {
+  body.home-view #widgets-wrap {
     grid-template-columns: minmax(0, 1fr);
     width: min(720px, 94%) !important;
   }
 
+  /* 窄屏收窄整体宽度;顺序仍是搜索 → 时间 → 热搜 → B站音乐 */
   body.home-view .information-widget-search,
   body.home-view .information-widget-datetime,
   body.home-view .information-widget-news,

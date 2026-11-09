@@ -118,7 +118,7 @@ describe("components/widgets/bilibili_music — B站搜索与手动选播", () =
     expect(swrMock).toHaveBeenLastCalledWith(expect.stringContaining("q=%E6%99%B4%E5%A4%A9"), expect.any(Object));
   });
 
-  it("点击搜索结果挂载同源纯音频播放条，全程没有视频画面", () => {
+  it("点击搜索结果挂载同源纯音频播放条，歌单仍常驻且当前项高亮", () => {
     render(<BilibiliMusic options={{ index: 4 }} />);
     searchFor("晴天");
     expect(document.querySelector("audio")).toBeNull();
@@ -132,11 +132,47 @@ describe("components/widgets/bilibili_music — B站搜索与手动选播", () =
     expect(audio).toHaveAttribute("autoplay");
     expect(document.querySelector("iframe")).toBeNull(); // 关键：不显示画面
     expect(screen.getByText(/仅音频播放/)).toBeInTheDocument();
-    expect(screen.queryAllByRole("button", { name: /^播放 / })).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: /^播放 / })).toHaveLength(3); // 播放时歌单不消失
+    expect(screen.getByRole("button", { name: "播放 【无损音质】《晴天》" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(document.querySelector(".bili-list-item-playing")).not.toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "返回搜索结果" }));
+    fireEvent.click(screen.getByRole("button", { name: "停止播放" }));
     expect(document.querySelector("audio")).toBeNull();
     expect(screen.getAllByRole("button", { name: /^播放 / })).toHaveLength(3);
+  });
+
+  it("播放时可直接点歌单里的其它条目切歌", () => {
+    render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("晴天");
+    fireEvent.click(screen.getByRole("button", { name: "播放 【无损音质】《晴天》" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "播放 第三个视频" }));
+
+    expect(document.querySelector("audio").getAttribute("src")).toContain("bvid=BV1xx411c7mD");
+    expect(screen.getAllByRole("button", { name: /^播放 / })).toHaveLength(3);
+    expect(screen.getByRole("button", { name: "播放 第三个视频" })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("音量调整一次即锁定：切歌与再次播放都不会回弹到 100%", () => {
+    render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("晴天");
+    fireEvent.click(screen.getByRole("button", { name: "播放 【无损音质】《晴天》" }));
+
+    const audio = document.querySelector("audio");
+    audio.volume = 0.35;
+    fireEvent(audio, new Event("volumechange"));
+    expect(window.localStorage.getItem("homepage.bilibiliVolume")).toBe("0.35");
+
+    fireEvent.click(screen.getByRole("button", { name: "下一个" }));
+    const next = document.querySelector("audio");
+    expect(next.volume).toBeCloseTo(0.35);
+
+    next.volume = 1; // 模拟新音轨默认音量
+    fireEvent(next, new Event("play"));
+    expect(next.volume).toBeCloseTo(0.35);
   });
 
   it("纯音频支持上一个/下一个循环切换与播放结束自动切下一首", () => {

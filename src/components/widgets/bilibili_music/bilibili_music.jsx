@@ -1,13 +1,13 @@
 import classNames from "classnames";
 import { useSyncExternalStore, useState } from "react";
 import {
-  FiArrowLeft,
   FiChevronLeft,
   FiChevronRight,
   FiExternalLink,
   FiMusic,
   FiRefreshCw,
   FiSearch,
+  FiX,
 } from "react-icons/fi";
 import useSWR from "swr";
 
@@ -22,6 +22,8 @@ const DEFAULT_REFRESH_MS = 10 * 60 * 1000; // 同一关键词搜索结果缓存 
 const MAX_QUERY_LENGTH = 60;
 const MAX_PAGE = 10;
 const RECENT_KEY = "homepage.bilibiliRecent";
+const VOLUME_KEY = "homepage.bilibiliVolume";
+const MUTED_KEY = "homepage.bilibiliMuted";
 const EMPTY_RECENT = [];
 
 export function formatCount(value) {
@@ -93,6 +95,39 @@ function saveRecent(query) {
 
 function audioSrc(bvid) {
   return `${AUDIO_API}?bvid=${encodeURIComponent(bvid)}`;
+}
+
+/* ============ 音量锁定 ============
+   原生 <audio> 每首歌都会重新挂载(key=bvid),音量默认是 100%。
+   用户手动调整一次后把音量/静音状态记到 localStorage,之后每次挂载与开始播放
+   都自动应用该值 —— 调一次即锁定,切歌、自动下一首、刷新页面都不会回弹。 */
+function readAudioPrefs() {
+  try {
+    const raw = window.localStorage.getItem(VOLUME_KEY);
+    const parsed = raw === null ? 1 : Number(raw);
+    return {
+      volume: Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : 1,
+      muted: window.localStorage.getItem(MUTED_KEY) === "1",
+    };
+  } catch {
+    return { volume: 1, muted: false };
+  }
+}
+
+function saveAudioPrefs(element) {
+  try {
+    window.localStorage.setItem(VOLUME_KEY, String(element.volume));
+    window.localStorage.setItem(MUTED_KEY, element.muted ? "1" : "0");
+  } catch {
+    // 隐私模式下不记忆，本次会话内仍可正常调节
+  }
+}
+
+function lockAudioVolume(element) {
+  if (!element) return;
+  const prefs = readAudioPrefs();
+  element.volume = prefs.volume;
+  element.muted = prefs.muted;
 }
 
 export default function BilibiliMusic({ options }) {
@@ -242,7 +277,7 @@ export default function BilibiliMusic({ options }) {
             </div>
           )}
 
-          {current ? (
+          {current && (
             <div className="bili-player bili-audio-player">
               <div className="bili-player-bar">
                 <button
@@ -252,11 +287,11 @@ export default function BilibiliMusic({ options }) {
                     setPlaying(null);
                     setAudioError(false);
                   }}
-                  aria-label="返回搜索结果"
-                  title="返回搜索结果"
+                  aria-label="停止播放"
+                  title="停止播放"
                 >
-                  <FiArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>结果</span>
+                  <FiX className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>停止</span>
                 </button>
                 <span className="bili-now-title" title={current.title}>
                   {current.title}
@@ -288,11 +323,14 @@ export default function BilibiliMusic({ options }) {
 
               <audio
                 key={current.bvid}
+                ref={lockAudioVolume}
                 className="bili-audio-el"
                 src={audioSrc(current.bvid)}
                 controls
                 autoPlay
                 preload="metadata"
+                onPlay={(event) => lockAudioVolume(event.currentTarget)}
+                onVolumeChange={(event) => saveAudioPrefs(event.currentTarget)}
                 onEnded={() => shift(1)}
                 onError={() => setAudioError(true)}
               >
@@ -315,63 +353,66 @@ export default function BilibiliMusic({ options }) {
                 </button>
               </div>
             </div>
-          ) : (
-            <>
-              <ul className="bili-list">
-                {emptyText && (
-                  <li className={classNames("bili-empty", !query && "bili-empty-start")}>{emptyText}</li>
-                )}
-                {visible.map((item) => (
-                  <li key={item.bvid} className="bili-list-item">
-                    <button
-                      type="button"
-                      className="bili-play-btn"
-                      onClick={() => play(item.bvid)}
-                      aria-label={`播放 ${item.title}`}
-                      title={`${item.title} · ${item.author} · ${formatCount(item.view)} 播放 · ${formatDuration(item.duration)}`}
-                    >
-                      <span className="bili-rank">{item.rank}</span>
-                      <span className="bili-item-title">{item.title}</span>
-                      <span className="bili-item-meta">
-                        {formatCount(item.view)} · {formatDuration(item.duration)}
-                      </span>
-                    </button>
-                    <a
-                      href={item.link}
-                      target={target}
-                      rel="noreferrer"
-                      className="bili-open"
-                      aria-label={`在 B站打开 ${item.title}`}
-                      title="在 B站打开"
-                    >
-                      <FiExternalLink className="w-3 h-3" aria-hidden="true" />
-                    </a>
-                  </li>
-                ))}
-              </ul>
+          )}
 
-              {query && visible.length > 0 && (
-                <div className="bili-pager">
-                  <button
-                    type="button"
-                    onClick={() => changePage(-1)}
-                    disabled={page <= 1}
-                    aria-label="上一页"
-                  >
-                    <FiChevronLeft className="w-3 h-3" aria-hidden="true" /> 上一页
-                  </button>
-                  <span className="bili-item-meta">第 {page} 页</span>
-                  <button
-                    type="button"
-                    onClick={() => changePage(1)}
-                    disabled={page >= MAX_PAGE}
-                    aria-label="下一页"
-                  >
-                    下一页 <FiChevronRight className="w-3 h-3" aria-hidden="true" />
-                  </button>
-                </div>
-              )}
-            </>
+          {/* 歌单常驻：点选播放后仍完整显示，当前曲目高亮，可直接点其它条目切歌 */}
+          <ul className={classNames("bili-list", current && "bili-list-scrollable")}>
+            {emptyText && (
+              <li className={classNames("bili-empty", !query && "bili-empty-start")}>{emptyText}</li>
+            )}
+            {visible.map((item) => (
+              <li
+                key={item.bvid}
+                className={classNames("bili-list-item", item.bvid === playing && "bili-list-item-playing")}
+              >
+                <button
+                  type="button"
+                  className="bili-play-btn"
+                  onClick={() => play(item.bvid)}
+                  aria-label={`播放 ${item.title}`}
+                  aria-current={item.bvid === playing ? "true" : undefined}
+                  title={`${item.title} · ${item.author} · ${formatCount(item.view)} 播放 · ${formatDuration(item.duration)}`}
+                >
+                  <span className="bili-rank">{item.rank}</span>
+                  <span className="bili-item-title">{item.title}</span>
+                  <span className="bili-item-meta">
+                    {formatCount(item.view)} · {formatDuration(item.duration)}
+                  </span>
+                </button>
+                <a
+                  href={item.link}
+                  target={target}
+                  rel="noreferrer"
+                  className="bili-open"
+                  aria-label={`在 B站打开 ${item.title}`}
+                  title="在 B站打开"
+                >
+                  <FiExternalLink className="w-3 h-3" aria-hidden="true" />
+                </a>
+              </li>
+            ))}
+          </ul>
+
+          {query && visible.length > 0 && (
+            <div className="bili-pager">
+              <button
+                type="button"
+                onClick={() => changePage(-1)}
+                disabled={page <= 1}
+                aria-label="上一页"
+              >
+                <FiChevronLeft className="w-3 h-3" aria-hidden="true" /> 上一页
+              </button>
+              <span className="bili-item-meta">第 {page} 页</span>
+              <button
+                type="button"
+                onClick={() => changePage(1)}
+                disabled={page >= MAX_PAGE}
+                aria-label="下一页"
+              >
+                下一页 <FiChevronRight className="w-3 h-3" aria-hidden="true" />
+              </button>
+            </div>
           )}
         </div>
       </Raw>

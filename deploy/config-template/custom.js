@@ -47,13 +47,13 @@
     try { localStorage.setItem(key, value); } catch (e) { /* 隐私模式忽略 */ }
   }
 
-  /* ============ 分组视图与首页面板外框对齐 ============
-     首页视图下测量「热搜 + B站音乐」两栏的联合外框(最小 top / 最大 bottom),
-     相对主容器写入 :root CSS 变量;custom.css 用这两个变量把分组卡片区
-     定位到同一起点、同一高度。两栏并排时任一边变高都会重新对齐。
-     数值缓存到 localStorage:首次访问就停在某个分组时也能立刻对齐。 */
+  /* ============ 分组视图与首页热搜窗口对齐 ============
+     首页改成上下堆叠后,只测量「热搜窗口」(.information-widget-news)相对主容器的
+     top 与高度,写入 :root CSS 变量;custom.css 用这两个变量把分组卡片区
+     定位到同一起点、同一高度。音乐面板(含播放器与歌单)高度变化不再影响分组卡片区,
+     避免搜索/播放时卡片区被越拉越高。数值缓存到 localStorage。 */
   var PANEL_KEY = "homepage.newsPanel";
-  var PANEL_SELECTOR = ".information-widget-news, .information-widget-bilibili_music";
+  var PANEL_SELECTOR = ".information-widget-news";
   var panelObserver = null;
   var panelTargets = [];
 
