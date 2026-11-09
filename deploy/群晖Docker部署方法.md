@@ -1,9 +1,9 @@
 # 群晖 Docker 部署方法（Homepage 书签管理版）
 
-> **版本 v1.0.2（2026-11-09）** — 首页新增 **B站音乐榜**（榜单 + 官方播放器内嵌播放），百度热搜与音乐榜**左右并排**；热榜部件支持 **9 源标签切换**（百度 / 微博 / 知乎 / 头条 / 抖音 / B站热搜 + Bing / IT之家 / 少数派资讯），见 **6.6 节**。对应 git tag `v1.0.2`、镜像 `:v1.0.2` = `:latest` = `:sha-cc55e97`、digest `sha256:72395260b658a0beb17d8f58c164aa723ad6bd794c86f731acb38391dce59ceb`。
+> **版本 v1.0.3（2026-11-09）** — 右侧 B站部件改为 **「输入关键词搜索 → 手动点选 → 只播放声音、不显示画面」**，见 **6.7 节**；左侧 **9 源热榜标签切换** 与双栏布局不变（见 6.6 节）。对应 git tag `v1.0.3`、镜像 `:v1.0.3` = `:latest` = `:sha-PENDING_SHA`、digest `PENDING_DIGEST`。
 > 上一版 v1.0.1（新闻改百度热搜榜）见 **6.5 节**；更早定版坐标见 `CHANGELOG.md`。变更历史见仓库 `CHANGELOG.md`。
 >
-> ⚠️ **v1.0.2 是组件层 + 配置层双改动**：除了换镜像，还必须同步 `widgets.yaml` / `custom.js` / `custom.css` 三个配置文件（详见 6.6 节）。只换镜像不会出现音乐部件。
+> ⚠️ **v1.0.3 是组件层 + 配置层双改动**：除了换镜像，还必须同步 `widgets.yaml` / `custom.js` / `custom.css` 三个配置文件（详见 6.7 节）。只换镜像不会得到新版搜索 / 音频布局。
 
 > 配套 YAML：[`synology-compose.yaml`](./synology-compose.yaml)
 > 适用：群晖 DSM 7.2+ / Container Manager，**x86_64 机型**（已发布的镜像是 `linux/amd64`）
@@ -135,7 +135,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 > ⚠️ **以下为 v1.0.0 的更新记录**；当前版本是 v1.0.1（新闻部件改为百度热搜榜），见顶部版本块与 **6.5 节**。
 >
 > ✅ **2026-11-07 12:44 更新完成**：在「多引擎搜索 / 中文时间 / 首页常驻新闻列表 + 来源筛选 + 左侧导航固定位置」基础上，镜像内置的 `custom.js` / `custom.css` 已更新为**分组卡片区与新闻窗口同起点、同高度**（切换分组内容区不跳动，见 6.4 节）。`:latest` 与 `:sha-91876c4` 两个标签已推送 Docker Hub。
-> 当前 digest：`sha256:72395260b658a0beb17d8f58c164aa723ad6bd794c86f731acb38391dce59ceb`（`linux/amd64`）。
+> 当前 digest：`PENDING_DIGEST`（`linux/amd64`）。
 > - **升级已有部署**：① 用 `homepage-panel-align.zip` 覆盖配置目录里的 `custom.js` **和 `custom.css`**（**必做**，见 6.3 / 6.4 节；入口脚本不会覆盖你改过的配置文件）；② 需要一并更新镜像时，删掉 NAS 上的旧镜像 → 重拉 `latest` → 重建项目。若还没做 6.2 节的三部件升级，也按 **6.2 节**覆盖 `widgets.yaml`。
 > - 容器内实测 `/api/widgets/news?index=3` 返回 `feedNames: ["百度新闻","新浪国内","IT之家"]` 与 24 条新闻；**没有 `feedNames` 或返回 404 = 仍是旧镜像**。
 > - 离线兜底：`homepage-image-20261107.tar`（80MB，**已重新导出为 12:44 版**，含导航固定 + 卡片区对齐）按 **C 方案**导入；NAS 上若有同名旧文件，先删再传。`homepage-image-20261106.tar` 是更旧的一版（轮播 + 下拉窗口），不要用。
@@ -145,9 +145,10 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 | 标签 | 用途 |
 |---|---|
-| `boyu233/homepage-bookmark-manager:v1.0.2` | **当前定版标签**（2026-11-09，B站音乐榜 + 双栏首页，见 6.6 节），推荐部署时固定使用，避免 `latest` 漂移 |
-| `boyu233/homepage-bookmark-manager:latest` | 当前最新，与 `:v1.0.2` 同 digest；**配套 `synology-compose.yaml` 已固定为 `:v1.0.2`**，避免 Container Manager 吃 `latest` 本地缓存 |
-| `boyu233/homepage-bookmark-manager:sha-cc55e97` | 当前固定版本（B站音乐榜 + 双栏布局 + 百度热搜 + 卡片区对齐 + 导航固定），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:v1.0.3` | **当前定版标签**（2026-11-09，B站搜索 + 纯音频、9 源热榜 + 双栏首页，见 6.7 节），推荐部署时固定使用，避免 `latest` 漂移 |
+| `boyu233/homepage-bookmark-manager:latest` | 当前最新，与 `:v1.0.3` 同 digest；**配套 `synology-compose.yaml` 已固定为 `:v1.0.3`**，避免 Container Manager 吃 `latest` 本地缓存 |
+| `boyu233/homepage-bookmark-manager:sha-PENDING_SHA` | 当前固定版本（B站搜索 + 纯音频 + 9 源热榜 + 双栏布局），回滚 / 复现用 |
+| `boyu233/homepage-bookmark-manager:v1.0.2` | 上一版（B站音乐榜 + 16:9 播放器），需要回退旧行为时用 |
 | `boyu233/homepage-bookmark-manager:v1.0.1` | 上一版定版（2026-11-09，百度热搜榜，见 6.5 节），需回退单栏布局时用 |
 | `boyu233/homepage-bookmark-manager:sha-390aaa3` | v1.0.1 对应的固定版本 |
 | `boyu233/homepage-bookmark-manager:v1.0.0` | 更早定版（2026-11-07，RSS 新闻聚合），需要回退旧行为时用 |
@@ -158,7 +159,7 @@ sudo chmod -R u+rwX /volume1/docker/homepage/config
 
 - 群晖：Container Manager → **映像 → 添加 → 从 URL 添加**，填 `boyu233/homepage-bookmark-manager:latest`；或 SSH `docker pull boyu233/homepage-bookmark-manager:latest`。
 - 也可直接跳到第 6 节创建项目，Container Manager 会自动拉取。
-- 当前镜像 digest：`sha256:72395260b658a0beb17d8f58c164aa723ad6bd794c86f731acb38391dce59ceb`（`latest` / `v1.0.2` / `sha-cc55e97` 指向同一镜像）。
+- 当前镜像 digest：`PENDING_DIGEST`（`latest` / `v1.0.3` / `sha-PENDING_SHA` 指向同一镜像）。
 - v1.0.1 镜像 digest：`sha256:678821c624cf4f572cceb7f5ca42c7964b31a993ff9f4299e5613338ee71616d`（`v1.0.1` / `sha-390aaa3`）。
 - ⚠️ **2026-11-06 曾发布过一版有问题的镜像**（digest `sha256:89df5596…341d1b`，tag `:sha-2b5aefa`）：入口脚本带 CRLF，容器会无限重启并报 `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`。**如果之前拉过镜像，必须先删除 NAS 上的旧镜像再重建项目**，否则 Docker 会直接用本地缓存继续起坏容器。
 
@@ -371,9 +372,10 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ---
 
-## 6.6 v1.0.2：B站音乐榜 + 首页双栏（2026-11-09）
+## 6.6 v1.0.2：B站音乐榜 + 首页双栏（2026-11-09，历史）
 
-> ⚠️ **本节覆盖 6.2 / 6.4 节里「首页单栏堆叠、只测新闻窗口」的描述**。v1.0.2 起首页为双栏，卡片区对齐改为测量两个面板的联合外框。
+> ⚠️ **本节关于 B站「音乐榜 / 16:9 播放器 / 24 小时刷新」的内容已被 6.7 节的 v1.0.3 覆盖**；其中关于 9 源热榜标签与双栏布局的说明仍然有效。
+> 本节同时覆盖 6.2 / 6.4 节里「首页单栏堆叠、只测新闻窗口」的描述：v1.0.2 起首页为双栏，卡片区对齐改为测量两个面板的联合外框。
 
 **做了什么**：新增 `bilibili_music` 部件。服务端固定代理 B站音乐区排行榜 `https://api.bilibili.com/x/web-interface/ranking/v2?rid=3&type=all`（裸请求 `code: 0`，返回约 97 条），解析排名 / 标题 / UP主 / 时长 / 播放数 / 点赞数 / 分区，服务端缓存默认 **24 小时**、上限 50 条。点击榜单条目，在当前页挂载 B站官方播放器 iframe：
 
@@ -440,6 +442,64 @@ curl -i http://127.0.0.1:3030/manage | head -5
 | 点击条目没声音 | 浏览器自动播放策略：再点一次播放器内的播放键；或检查广告拦截插件是否挡了 `player.bilibili.com` |
 | 桌面端两栏却上下堆叠 | `custom.css` 还是旧版，按上方第 2 步同步 |
 | 切到书签分组后卡片区高度不对 | `custom.js` 还是旧版（只测新闻窗口），更新后 Ctrl+F5 |
+
+---
+
+## 6.7 v1.0.3：B站搜索 + 纯音频播放（2026-11-09）
+
+> ⚠️ **本节覆盖 6.6 节里「B站音乐榜 / 16:9 播放器 / 24 小时刷新」的全部描述**。v1.0.3 起右侧部件不再自动出榜单、也不显示任何视频画面。
+
+**做了什么**：右侧 `bilibili_music` 部件（key 沿用历史命名）改成三步：
+
+| 步骤 | 行为 |
+|---|---|
+| ① 搜索 | 输入关键词回车或点搜索按钮，服务端固定代理 `api.bilibili.com/x/web-interface/wbi/search/type?search_type=video`（完整 Chrome UA 下免登录可用，每页 20 条）。标题里的 `<em class="keyword">` 高亮标签与 HTML 实体会被剥成纯文本；`bvid` 走白名单，链接由服务端拼接 |
+| ② 手动选 | 结果列表显示序号 / 标题 / UP主 / 播放量 / 时长 / 「在 B站打开」；支持最近搜索词、示例词、分页（最多 10 页）、重新搜索。**不搜索就不请求上游**，面板只显示输入提示 |
+| ③ 纯音频播放 | 点击条目后，列表**替换**为音轨信息条 + 原生 `<audio controls>`：可播放 / 暂停 / 拖进度 / 调音量，播放结束自动切下一首，另有上一个 / 下一个 / 返回结果。**页面里没有 iframe、没有封面、没有视频画面** |
+
+**音频为什么要代理**：B站 DASH 音轨 CDN 强制校验 `Referer: https://www.bilibili.com/`，第三方站点或空 Referer 一律返回 403，浏览器 `<audio>` 无法直连。因此新增同源接口 `/api/widgets/bilibili_audio?bvid=<BV号>`：
+
+```
+浏览器 <audio>  ──同源──>  容器 /api/widgets/bilibili_audio
+                              ├─ wbi/view       取 cid（缓存 24 小时）
+                              ├─ playurl fnval=16  取 DASH 音轨，自动选最高码率（免登录 3 档，最高约 184kbps 的 fMP4）
+                              └─ 带 Referer + Range 请求 CDN，流式转发 200/206 与 Content-Range 回浏览器
+```
+
+音轨地址带时效签名，缓存 20 分钟后会重新获取；CDN 域名走后缀白名单（防 SSRF），备用地址优先选标准 443 端口，避免部分网络拦截 8082 / 4483。浏览器只连自己的 NAS，访客 IP / Referer 不暴露给 B站。
+
+**刷新周期**：同一「关键词 + 页码」的搜索结果服务端缓存 **10 分钟**（`widgets.yaml` → `bilibili_music.refreshInterval: 600000`）；工具栏刷新按钮带 `force=1` 可立即重搜（保留 60 秒最小间隔防风控）。左侧 9 源热榜仍是热榜 60 秒 / 资讯 5 分钟，互不影响。
+
+**安全**：关键词去控制字符 / 压缩空白 / ≤60 字，页码 clamp 1–10，上游地址写死，`bvid` 与 CDN 域名双重白名单，音频接口只放行 GET / HEAD。
+
+### 升级步骤（换镜像 + 同步三个配置文件）
+
+1. 删 NAS 旧镜像 → 重拉 `boyu233/homepage-bookmark-manager:v1.0.3`（或离线 `docker load -i homepage-image-v1.0.3.tar`）→ 重建项目。
+2. 同步配置：先备份 `custom.js` 里自定义过的 `WALLPAPER_*` 图源，然后删除挂载目录（compose `volumes` 冒号**左侧**）里的 `widgets.yaml`、`custom.js`、`custom.css` 三个文件，重启容器，日志出现 `Applied bundled default: ...` 即自动补齐 v1.0.3 版。**不要删 `bookmarks.yaml`**。也可用升级包里的同名文件直接覆盖。
+3. **Ctrl+F5** 强刷。
+
+| 只做了一半 | 现象 |
+|---|---|
+| 只换镜像，配置没同步 | 右侧仍是 v1.0.2 的「B站音乐榜」标题 / 旧样式，搜索框不出现（旧 `widgets.yaml` 没有新配置） |
+| 只同步配置，镜像没换 | 页面显示 `Missing bilibili_music` 或旧榜单行为 |
+
+### 自检
+
+- 页面：右侧为搜索框 + 提示；搜「晴天」后出结果列表；点一条后出现音频控制条，**按 F12 检查 DOM 里没有 `iframe`**；音频控件能出声、可拖进度。
+- 搜索 API：`/api/widgets/bilibili_music?index=4&q=%E6%99%B4%E5%A4%A9` → `query: "晴天"`、`items` ≤20、条目带 `bvid` / `rank` / `link`。
+- 音频 API：`/api/widgets/bilibili_audio?bvid=BV1BZbSzZEGT` → `200` 或 `206`、`Content-Type: audio/mp4`；带非法 bvid 返回 `400`。
+- 9 源热榜：`/api/widgets/news?index=3&source=weibo` → `sourceLabel: "微博热搜"`、`availableSources` 9 项。
+
+### 排错
+
+| 现象 | 原因 / 处理 |
+|---|---|
+| 搜索一直「暂不可用」 | 容器不能出网 `api.bilibili.com` 或被风控；看 `docker logs homepage` 的 `B站搜索失败`。简写 UA 会被判爬虫返回 `code=-352`，本版已统一完整 Chrome UA |
+| 结果出来了，点条目没声音 | ① 浏览器拦了自动播放 → 手动点音频控件里的播放键；② 视频无独立音轨 → 面板显示「音频加载失败」，换一条；③ 容器不能出网 B站 CDN（`*.bilivideo.com` / `*.mcdn.bilivideo.cn`） |
+| 音频播放卡 / 拖不动进度 | 代理需透传 Range；检查是否有 Nginx 反代缓冲了响应。直连容器 IP:端口 再试一次 |
+| 有画面 / 出现 16:9 播放器 | 还是 v1.0.2 镜像或旧 `custom.css`，按上面第 1、2 步重做 |
+| 想改每页条数 / 缓存 | 改 `widgets.yaml` 的 `bilibili_music.limit`（1-20）与 `refreshInterval`（毫秒），Ctrl+F5 即可，**不用换镜像** |
+| 多人同时播放占带宽 | 音频经容器转发，184kbps 档约 6 MB / 首；属预期行为 |
 
 ---
 

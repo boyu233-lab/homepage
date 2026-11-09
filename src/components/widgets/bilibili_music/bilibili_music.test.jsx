@@ -16,41 +16,39 @@ import BilibiliMusic, { formatCount, formatDuration } from "./bilibili_music";
 const items = [
   {
     rank: 1,
-    bvid: "BV17VZpY1ENA",
-    title: "给我们的组合起个名！",
-    author: "田一名sir",
-    category: "翻唱",
-    duration: 15,
-    view: 17882158,
-    link: "https://www.bilibili.com/video/BV17VZpY1ENA",
+    bvid: "BV1BZbSzZEGT",
+    title: "【无损音质】《晴天》",
+    author: "VV音乐局",
+    duration: 270,
+    view: 3460783,
+    link: "https://www.bilibili.com/video/BV1BZbSzZEGT",
   },
   {
     rank: 2,
-    bvid: "BV1GJ411x7h7",
-    title: "第二首歌",
+    bvid: "BV1d4411N7zD",
+    title: "【4K修复】晴天 MV",
     author: "某UP主",
-    duration: 215,
+    duration: 3725,
     view: 9800,
-    link: "https://www.bilibili.com/video/BV1GJ411x7h7",
+    link: "https://www.bilibili.com/video/BV1d4411N7zD",
   },
   {
     rank: 3,
     bvid: "BV1xx411c7mD",
-    title: "第三首歌",
+    title: "第三个视频",
     author: "另一UP主",
-    duration: 3725,
+    duration: 65,
     view: 123456789,
     link: "https://www.bilibili.com/video/BV1xx411c7mD",
   },
 ];
 
 const payload = {
+  query: "周杰伦 晴天",
+  page: 1,
+  total: 1000,
   items,
-  feedNames: ["B站音乐榜"],
-  sources: 1,
-  updatedAt: "2026-11-09T11:08:54.000Z",
-  boardName: "音乐榜",
-  total: 97,
+  updatedAt: "2026-11-09T12:08:54.000Z",
 };
 
 const mutate = vi.fn();
@@ -65,104 +63,159 @@ function mockSWR(overrides = {}) {
   });
 }
 
-describe("components/widgets/bilibili_music — B站音乐榜", () => {
+function searchFor(text) {
+  fireEvent.change(screen.getByRole("searchbox", { name: "搜索关键词" }), { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: "搜索 B站视频" }));
+}
+
+describe("components/widgets/bilibili_music — B站搜索与手动选播", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     swrMock.mockReset();
     mutate.mockReset();
     global.fetch = vi.fn(async () => ({ json: async () => payload }));
     mockSWR();
   });
 
-  it("常驻铺开榜单：排名、标题、播放量、时长、B站外链、更新时间", () => {
+  it("初始为搜索起始态：不请求上游，显示输入框与提示", () => {
     render(<BilibiliMusic options={{ index: 4 }} />);
+    expect(swrMock).toHaveBeenCalledWith(null, expect.any(Object));
+    expect(screen.getByRole("searchbox", { name: "搜索关键词" })).toBeInTheDocument();
+    expect(screen.getByText("输入关键词搜索 B站视频，点击结果即可在此播放")).toBeInTheDocument();
+    expect(screen.queryAllByRole("button", { name: /^播放 / })).toHaveLength(0);
+  });
 
-    expect(screen.getByRole("list")).toBeInTheDocument();
+  it("提交关键词后按 q/page/refreshInterval 请求搜索并列出结果", () => {
+    render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("周杰伦 晴天");
+
+    expect(swrMock).toHaveBeenLastCalledWith(
+      expect.stringContaining("q=%E5%91%A8%E6%9D%B0%E4%BC%A6+%E6%99%B4%E5%A4%A9"),
+      expect.any(Object),
+    );
     expect(screen.getAllByRole("button", { name: /^播放 / })).toHaveLength(3);
-    expect(screen.getByText("给我们的组合起个名！")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument();
-    expect(screen.getByText("1788.2万 · 0:15")).toBeInTheDocument();
-    expect(screen.getByText("9800 · 3:35")).toBeInTheDocument();
-    expect(screen.getByText("1.2亿 · 1:02:05")).toBeInTheDocument();
+    expect(screen.getByText("【无损音质】《晴天》")).toBeInTheDocument();
+    expect(screen.getByText("346.1万 · 4:30")).toBeInTheDocument();
+    expect(screen.getByText("9800 · 1:02:05")).toBeInTheDocument();
+    expect(screen.getByText("1.2亿 · 1:05")).toBeInTheDocument();
     expect(screen.getAllByRole("link")).toHaveLength(3);
-    expect(screen.getByRole("link", { name: "在 B站打开 第二首歌" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "在 B站打开 【4K修复】晴天 MV" })).toHaveAttribute(
       "href",
-      "https://www.bilibili.com/video/BV1GJ411x7h7",
+      "https://www.bilibili.com/video/BV1d4411N7zD",
     );
-    expect(screen.getByText(/更新于/)).toBeInTheDocument();
+    expect(screen.getByText(/第 1 页 · 更新于/)).toBeInTheDocument();
   });
 
-  it("前三名徽标按红/橙/黄着色", () => {
+  it("搜索词记入最近搜索，起始态可一键再次搜索", () => {
+    const first = render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("晴天");
+    expect(JSON.parse(window.localStorage.getItem("homepage.bilibiliRecent"))).toEqual(["晴天"]);
+    first.unmount();
+
     render(<BilibiliMusic options={{ index: 4 }} />);
-    const badges = screen.getAllByText(/^[1-3]$/);
-    expect(badges[0]).toHaveStyle({ color: "#f87171" });
-    expect(badges[1]).toHaveStyle({ color: "#fb923c" });
-    expect(badges[2]).toHaveStyle({ color: "#fbbf24" });
+    expect(screen.getByText("最近搜索")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "晴天" }));
+    expect(swrMock).toHaveBeenLastCalledWith(expect.stringContaining("q=%E6%99%B4%E5%A4%A9"), expect.any(Object));
   });
 
-  it("点击条目在当前页挂载 B站官方播放器，可返回榜单", () => {
+  it("点击搜索结果挂载同源纯音频播放条，全程没有视频画面", () => {
     render(<BilibiliMusic options={{ index: 4 }} />);
-    expect(document.querySelector("iframe")).toBeNull();
+    searchFor("晴天");
+    expect(document.querySelector("audio")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "播放 给我们的组合起个名！" }));
+    fireEvent.click(screen.getByRole("button", { name: "播放 【无损音质】《晴天》" }));
 
-    const frame = screen.getByTitle("B站播放器：给我们的组合起个名！");
-    expect(frame).toHaveAttribute("allow", "autoplay; fullscreen; picture-in-picture");
-    expect(frame.getAttribute("src")).toContain("https://player.bilibili.com/player.html?");
-    expect(frame.getAttribute("src")).toContain("bvid=BV17VZpY1ENA");
-    expect(frame.getAttribute("src")).toContain("autoplay=1");
-    expect(frame.getAttribute("src")).toContain("danmaku=0");
-    expect(screen.queryByRole("list")).toBeNull();
+    const audio = document.querySelector("audio.bili-audio-el");
+    expect(audio).not.toBeNull();
+    expect(audio.getAttribute("src")).toBe("/api/widgets/bilibili_audio?bvid=BV1BZbSzZEGT");
+    expect(audio).toHaveAttribute("controls");
+    expect(audio).toHaveAttribute("autoplay");
+    expect(document.querySelector("iframe")).toBeNull(); // 关键：不显示画面
+    expect(screen.getByText(/仅音频播放/)).toBeInTheDocument();
+    expect(screen.queryAllByRole("button", { name: /^播放 / })).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "返回音乐榜" }));
-    expect(document.querySelector("iframe")).toBeNull();
-    expect(screen.getByRole("list")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "返回搜索结果" }));
+    expect(document.querySelector("audio")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^播放 / })).toHaveLength(3);
   });
 
-  it("播放器内可上一首/下一首循环切换", () => {
+  it("纯音频支持上一个/下一个循环切换与播放结束自动切下一首", () => {
     render(<BilibiliMusic options={{ index: 4 }} />);
-    fireEvent.click(screen.getByRole("button", { name: "播放 给我们的组合起个名！" }));
+    searchFor("晴天");
+    fireEvent.click(screen.getByRole("button", { name: "播放 【无损音质】《晴天》" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "下一首" }));
-    expect(screen.getByTitle("B站播放器：第二首歌").getAttribute("src")).toContain(
-      "bvid=BV1GJ411x7h7",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "下一个" }));
+    expect(document.querySelector("audio").getAttribute("src")).toContain("bvid=BV1d4411N7zD");
 
-    fireEvent.click(screen.getByRole("button", { name: "上一首" }));
-    expect(screen.getByTitle("B站播放器：给我们的组合起个名！")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "上一个" }));
+    expect(document.querySelector("audio").getAttribute("src")).toContain("bvid=BV1BZbSzZEGT");
 
-    fireEvent.click(screen.getByRole("button", { name: "上一首" }));
-    expect(screen.getByTitle("B站播放器：第三首歌")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "上一个" }));
+    expect(document.querySelector("audio").getAttribute("src")).toContain("bvid=BV1xx411c7mD");
+
+    fireEvent.ended(document.querySelector("audio"));
+    expect(document.querySelector("audio").getAttribute("src")).toContain("bvid=BV1BZbSzZEGT");
   });
 
-  it("limit 限制铺开的条数", () => {
+  it("音频加载失败时给出提示，切歌后清除", () => {
+    render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("晴天");
+    fireEvent.click(screen.getByRole("button", { name: "播放 【无损音质】《晴天》" }));
+
+    fireEvent.error(document.querySelector("audio"));
+    expect(screen.getByText(/音频加载失败/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "下一个" }));
+    expect(screen.queryByText(/音频加载失败/)).toBeNull();
+  });
+
+  it("结果可翻页，页码进入请求 key", () => {
+    render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("晴天");
+    expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    expect(swrMock).toHaveBeenLastCalledWith(expect.stringContaining("page=2"), expect.any(Object));
+  });
+
+  it("limit 限制每页展示条数", () => {
     render(<BilibiliMusic options={{ index: 4, limit: 2 }} />);
+    searchFor("晴天");
     expect(screen.getAllByRole("button", { name: /^播放 / })).toHaveLength(2);
   });
 
-  it("默认 24 小时刷新，间隔透传给服务端缓存", () => {
+  it("重新搜索走 force=1 跳过服务端缓存", () => {
     render(<BilibiliMusic options={{ index: 4 }} />);
-    expect(swrMock).toHaveBeenCalledWith(
-      expect.stringContaining("refreshInterval=86400000"),
-      expect.objectContaining({ refreshInterval: 86400000 }),
-    );
-  });
-
-  it("手动刷新走 force=1 强制重拉，不受 24 小时缓存影响", () => {
-    render(<BilibiliMusic options={{ index: 4 }} />);
-    fireEvent.click(screen.getByRole("button", { name: "刷新音乐榜" }));
+    searchFor("晴天");
+    fireEvent.click(screen.getByRole("button", { name: "重新搜索" }));
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("force=1"));
   });
 
-  it("没有数据或请求失败时显示提示而不是空白", () => {
+  it("空结果 / 请求失败 / 搜索中分别给出提示", () => {
     mockSWR({ data: { ...payload, items: [] } });
     const first = render(<BilibiliMusic options={{ index: 4 }} />);
-    expect(screen.getByText("暂无音乐榜，稍后会自动重试")).toBeInTheDocument();
+    searchFor("不存在的词");
+    expect(screen.getByText("没有找到相关视频，换个关键词试试")).toBeInTheDocument();
     first.unmount();
 
     mockSWR({ error: new Error("boom"), data: undefined });
+    const second = render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("晴天");
+    expect(screen.getByText("搜索暂不可用，稍后重试")).toBeInTheDocument();
+    second.unmount();
+
+    mockSWR({ data: undefined, isValidating: true });
     render(<BilibiliMusic options={{ index: 4 }} />);
-    expect(screen.getByText("音乐榜暂不可用，稍后会自动重试")).toBeInTheDocument();
+    searchFor("晴天");
+    expect(screen.getByText("正在搜索 B站视频…")).toBeInTheDocument();
+  });
+
+  it("空关键词不触发搜索", () => {
+    render(<BilibiliMusic options={{ index: 4 }} />);
+    searchFor("   ");
+    expect(screen.getByText("输入关键词搜索 B站视频，点击结果即可在此播放")).toBeInTheDocument();
+    expect(swrMock).toHaveBeenLastCalledWith(null, expect.any(Object));
   });
 
   it("formatCount / formatDuration 处理边界值", () => {

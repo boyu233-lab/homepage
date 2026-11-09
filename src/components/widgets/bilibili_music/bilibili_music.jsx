@@ -1,5 +1,5 @@
 import classNames from "classnames";
-import { useState } from "react";
+import { useSyncExternalStore, useState } from "react";
 import {
   FiArrowLeft,
   FiChevronLeft,
@@ -7,16 +7,22 @@ import {
   FiExternalLink,
   FiMusic,
   FiRefreshCw,
+  FiSearch,
 } from "react-icons/fi";
 import useSWR from "swr";
 
 import Container from "../widget/container";
 import Raw from "../widget/raw";
 
-const RANK_COLORS = ["#f87171", "#fb923c", "#fbbf24"];
-const PLAYER_BASE = "https://player.bilibili.com/player.html";
-// B站音乐区排行榜按天更新，默认 24 小时刷新一次（widgets.yaml 可覆盖）
-const DEFAULT_REFRESH_MS = 24 * 60 * 60 * 1000;
+// 历史命名：v1.0.2 这里是音乐区排行榜，v1.0.3 起改为「搜索 → 手动选播 → 纯音频播放」。
+// 组件路径 / widget key 不变，避免已有部署只换镜像时出现 Missing bilibili_music。
+// 音频走同源服务端代理（B站 CDN 强制校验 Referer），页面里只有 <audio>，不显示任何视频画面。
+const AUDIO_API = "/api/widgets/bilibili_audio";
+const DEFAULT_REFRESH_MS = 10 * 60 * 1000; // 同一关键词搜索结果缓存 10 分钟
+const MAX_QUERY_LENGTH = 60;
+const MAX_PAGE = 10;
+const RECENT_KEY = "homepage.bilibiliRecent";
+const EMPTY_RECENT = [];
 
 export function formatCount(value) {
   const number = Number(value);
@@ -36,106 +42,221 @@ export function formatDuration(value) {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(rest)}` : `${minutes}:${pad(rest)}`;
 }
 
-// 24 小时周期下只显示 HH:mm 看不出是哪天，带上月/日
 function formatUpdateTime(value) {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(parsed.getMonth() + 1)}/${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  return `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
 }
 
-function rankStyle(item) {
-  const rank = Number(item.rank);
-  if (rank >= 1 && rank <= 3) {
-    const color = RANK_COLORS[rank - 1];
-    return { background: `${color}2e`, color };
+// 最近搜索词存浏览器本地：用外部存储读取，避免 SSR hydration 不一致，
+// 也不需要在 effect 里同步 setState（react-hooks/set-state-in-effect）。
+const listeners = new Set();
+let cachedRaw;
+let cachedRecent = EMPTY_RECENT;
+
+function subscribe(callback) {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+function getSnapshot() {
+  try {
+    const raw = window.localStorage.getItem(RECENT_KEY);
+    if (raw === cachedRaw) return cachedRecent;
+    cachedRaw = raw;
+    const parsed = JSON.parse(raw || "[]");
+    cachedRecent = Array.isArray(parsed)
+      ? parsed.filter((entry) => typeof entry === "string" && entry.trim()).slice(0, 6)
+      : EMPTY_RECENT;
+  } catch {
+    cachedRaw = undefined;
+    cachedRecent = EMPTY_RECENT;
   }
-  return undefined;
+  return cachedRecent;
 }
 
-function playerUrl(bvid) {
-  const params = new URLSearchParams({
-    bvid,
-    page: "1",
-    high_quality: "1",
-    danmaku: "0",
-    autoplay: "1", // 用户点击后才挂载 iframe，属于用户手势后的播放
-  });
-  return `${PLAYER_BASE}?${params}`;
+function getServerSnapshot() {
+  return EMPTY_RECENT;
+}
+
+function saveRecent(query) {
+  try {
+    const next = [query, ...getSnapshot().filter((entry) => entry !== query)].slice(0, 6);
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    cachedRaw = undefined;
+    listeners.forEach((callback) => callback());
+  } catch {
+    // 隐私模式下 localStorage 不可用，搜索本身不受影响
+  }
+}
+
+function audioSrc(bvid) {
+  return `${AUDIO_API}?bvid=${encodeURIComponent(bvid)}`;
 }
 
 export default function BilibiliMusic({ options }) {
   const {
     index,
-    label = "B站音乐榜",
+    label = "B站搜索",
     limit = 10,
     refreshInterval = DEFAULT_REFRESH_MS,
     target = "_blank",
   } = options;
 
   const refreshMs = Math.max(60000, Number(refreshInterval) || DEFAULT_REFRESH_MS);
-  const key = `/api/widgets/bilibili_music?${new URLSearchParams({
-    index: String(index ?? 0),
-    refreshInterval: String(refreshMs),
-  })}`;
+  const [draft, setDraft] = useState("");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [playing, setPlaying] = useState(null);
+  const [audioError, setAudioError] = useState(false);
+  const recent = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  // 未搜索时 key 为 null：SWR 不会请求上游，右侧保持干净的搜索起始态
+  const key = query
+    ? `/api/widgets/bilibili_music?${new URLSearchParams({
+        index: String(index ?? 0),
+        q: query,
+        page: String(page),
+        refreshInterval: String(refreshMs),
+      })}`
+    : null;
 
   const { data, error, isValidating, mutate } = useSWR(key, {
-    refreshInterval: refreshMs,
     revalidateOnFocus: false,
+    revalidateOnReconnect: false,
   });
 
-  const maxItems = Math.min(50, Math.max(1, Number(limit) || 10));
-  const items = Array.isArray(data?.items) ? data.items : [];
+  const maxItems = Math.min(20, Math.max(1, Number(limit) || 10));
+  const items = query && Array.isArray(data?.items) ? data.items : [];
   const visible = items.slice(0, maxItems);
-  const [playing, setPlaying] = useState(null);
-
   const currentIndex = visible.findIndex((item) => item.bvid === playing);
   const current = currentIndex >= 0 ? visible[currentIndex] : null;
+
+  const runSearch = (text) => {
+    const cleaned = String(text ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, MAX_QUERY_LENGTH);
+    if (!cleaned) return;
+    setDraft(cleaned);
+    setQuery(cleaned);
+    setPage(1);
+    setPlaying(null);
+    setAudioError(false);
+    saveRecent(cleaned);
+  };
+
+  const submit = (event) => {
+    event.preventDefault();
+    runSearch(draft);
+  };
+
+  const play = (bvid) => {
+    setAudioError(false);
+    setPlaying(bvid);
+  };
 
   const shift = (delta) => {
     if (currentIndex < 0 || !visible.length) return;
     const next = (currentIndex + delta + visible.length) % visible.length;
-    setPlaying(visible[next].bvid);
+    play(visible[next].bvid);
   };
 
-  // 24 小时服务端缓存下，普通 mutate 只会拿回缓存；带 force=1 才真正重拉上游
-  const refresh = () =>
+  const changePage = (delta) => {
+    setPlaying(null);
+    setAudioError(false);
+    setPage((currentPage) => Math.min(MAX_PAGE, Math.max(1, currentPage + delta)));
+  };
+
+  // 手动刷新带 force=1：跳过服务端 10 分钟缓存，立即重拉上游
+  const refresh = () => {
+    if (!key) return;
     mutate(fetch(`${key}&force=1`).then((response) => response.json()), { revalidate: false });
+  };
+
+  let emptyText = "";
+  if (!query) emptyText = "输入关键词搜索 B站视频，点击结果即可在此播放";
+  else if (error || data?.error) emptyText = "搜索暂不可用，稍后重试";
+  else if (isValidating && !visible.length) emptyText = "正在搜索 B站视频…";
+  else if (!visible.length) emptyText = "没有找到相关视频，换个关键词试试";
 
   return (
     <Container options={options} additionalClassNames="information-widget-bilibili_music">
       <Raw>
         <div className="bili-widget w-full">
           <div className="bili-toolbar">
-            <FiMusic className="bili-toolbar-icon w-4 h-4" aria-hidden="true" />
+            <FiSearch className="bili-toolbar-icon w-4 h-4" aria-hidden="true" />
             <span className="bili-label">{label}</span>
-            {data?.updatedAt && (
-              <span className="bili-item-meta">更新于 {formatUpdateTime(data.updatedAt)}</span>
+            {query && data?.updatedAt && (
+              <span className="bili-item-meta">
+                第 {page} 页 · 更新于 {formatUpdateTime(data.updatedAt)}
+              </span>
             )}
             <button
               type="button"
               onClick={refresh}
-              title="刷新音乐榜"
-              aria-label="刷新音乐榜"
+              disabled={!query}
+              title="重新搜索"
+              aria-label="重新搜索"
               className="bili-refresh"
             >
               <FiRefreshCw className={classNames("w-3.5 h-3.5", isValidating && "animate-spin")} />
             </button>
           </div>
 
+          <form className="bili-search-form" onSubmit={submit} role="search">
+            <input
+              className="bili-search-input"
+              type="search"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="搜索 B站视频 / 音乐 / UP主…"
+              aria-label="搜索关键词"
+              maxLength={MAX_QUERY_LENGTH}
+            />
+            <button type="submit" className="bili-search-btn" aria-label="搜索 B站视频" title="搜索">
+              <FiSearch className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          </form>
+
+          {!query && recent.length > 0 && (
+            <div className="bili-recent">
+              <span className="bili-recent-label">最近搜索</span>
+              {recent.map((entry) => (
+                <button key={entry} type="button" onClick={() => runSearch(entry)} title={`搜索 ${entry}`}>
+                  {entry}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!query && (
+            <div className="bili-suggest">
+              <span>试试：</span>
+              {["周杰伦", "纯音乐", "白噪音", "Lo-Fi"].map((entry) => (
+                <button key={entry} type="button" onClick={() => runSearch(entry)} title={`搜索 ${entry}`}>
+                  {entry}
+                </button>
+              ))}
+            </div>
+          )}
+
           {current ? (
-            <div className="bili-player">
+            <div className="bili-player bili-audio-player">
               <div className="bili-player-bar">
                 <button
                   type="button"
                   className="bili-back"
-                  onClick={() => setPlaying(null)}
-                  aria-label="返回音乐榜"
-                  title="返回音乐榜"
+                  onClick={() => {
+                    setPlaying(null);
+                    setAudioError(false);
+                  }}
+                  aria-label="返回搜索结果"
+                  title="返回搜索结果"
                 >
                   <FiArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>榜单</span>
+                  <span>结果</span>
                 </button>
                 <span className="bili-now-title" title={current.title}>
                   {current.title}
@@ -152,65 +273,105 @@ export default function BilibiliMusic({ options }) {
                 </a>
               </div>
 
-              <iframe
+              {/* 纯音频：没有 iframe / 封面 / 视频画面，只有同源代理出来的音轨 */}
+              <div className="bili-audio-body">
+                <span className="bili-audio-art" aria-hidden="true">
+                  <FiMusic className="w-6 h-6" />
+                </span>
+                <span className="bili-audio-info">
+                  <span className="bili-audio-title">{current.title}</span>
+                  <span className="bili-item-meta">
+                    {current.author} · {formatDuration(current.duration)} · 仅音频播放
+                  </span>
+                </span>
+              </div>
+
+              <audio
                 key={current.bvid}
-                className="bili-player-frame"
-                src={playerUrl(current.bvid)}
-                title={`B站播放器：${current.title}`}
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowFullScreen
-              />
+                className="bili-audio-el"
+                src={audioSrc(current.bvid)}
+                controls
+                autoPlay
+                preload="metadata"
+                onEnded={() => shift(1)}
+                onError={() => setAudioError(true)}
+              >
+                <track kind="captions" />
+              </audio>
+
+              {audioError && (
+                <div className="bili-audio-error">音频加载失败：该视频可能没有音轨，或 B站暂时拒绝了请求</div>
+              )}
 
               <div className="bili-player-controls">
-                <button type="button" onClick={() => shift(-1)} aria-label="上一首" title="上一首">
+                <button type="button" onClick={() => shift(-1)} aria-label="上一个" title="上一个">
                   <FiChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </button>
                 <span className="bili-item-meta">
                   {currentIndex + 1} / {visible.length} · {current.author}
                 </span>
-                <button type="button" onClick={() => shift(1)} aria-label="下一首" title="下一首">
+                <button type="button" onClick={() => shift(1)} aria-label="下一个" title="下一个">
                   <FiChevronRight className="w-4 h-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
           ) : (
-            <ul className="bili-list">
-              {error && <li className="bili-empty">音乐榜暂不可用，稍后会自动重试</li>}
-              {!error && visible.length === 0 && (
-                <li className="bili-empty">
-                  {isValidating ? "正在获取音乐榜…" : "暂无音乐榜，稍后会自动重试"}
-                </li>
-              )}
-              {visible.map((item, itemIndex) => (
-                <li key={item.bvid} className="bili-list-item">
+            <>
+              <ul className="bili-list">
+                {emptyText && (
+                  <li className={classNames("bili-empty", !query && "bili-empty-start")}>{emptyText}</li>
+                )}
+                {visible.map((item) => (
+                  <li key={item.bvid} className="bili-list-item">
+                    <button
+                      type="button"
+                      className="bili-play-btn"
+                      onClick={() => play(item.bvid)}
+                      aria-label={`播放 ${item.title}`}
+                      title={`${item.title} · ${item.author} · ${formatCount(item.view)} 播放 · ${formatDuration(item.duration)}`}
+                    >
+                      <span className="bili-rank">{item.rank}</span>
+                      <span className="bili-item-title">{item.title}</span>
+                      <span className="bili-item-meta">
+                        {formatCount(item.view)} · {formatDuration(item.duration)}
+                      </span>
+                    </button>
+                    <a
+                      href={item.link}
+                      target={target}
+                      rel="noreferrer"
+                      className="bili-open"
+                      aria-label={`在 B站打开 ${item.title}`}
+                      title="在 B站打开"
+                    >
+                      <FiExternalLink className="w-3 h-3" aria-hidden="true" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+
+              {query && visible.length > 0 && (
+                <div className="bili-pager">
                   <button
                     type="button"
-                    className="bili-play-btn"
-                    onClick={() => setPlaying(item.bvid)}
-                    aria-label={`播放 ${item.title}`}
-                    title={`${item.title} · ${item.author} · ${formatCount(item.view)} 播放 · ${formatDuration(item.duration)}`}
+                    onClick={() => changePage(-1)}
+                    disabled={page <= 1}
+                    aria-label="上一页"
                   >
-                    <span className="bili-rank" style={rankStyle(item)}>
-                      {item.rank || itemIndex + 1}
-                    </span>
-                    <span className="bili-item-title">{item.title}</span>
-                    <span className="bili-item-meta">
-                      {formatCount(item.view)} · {formatDuration(item.duration)}
-                    </span>
+                    <FiChevronLeft className="w-3 h-3" aria-hidden="true" /> 上一页
                   </button>
-                  <a
-                    href={item.link}
-                    target={target}
-                    rel="noreferrer"
-                    className="bili-open"
-                    aria-label={`在 B站打开 ${item.title}`}
-                    title="在 B站打开"
+                  <span className="bili-item-meta">第 {page} 页</span>
+                  <button
+                    type="button"
+                    onClick={() => changePage(1)}
+                    disabled={page >= MAX_PAGE}
+                    aria-label="下一页"
                   >
-                    <FiExternalLink className="w-3 h-3" aria-hidden="true" />
-                  </a>
-                </li>
-              ))}
-            </ul>
+                    下一页 <FiChevronRight className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </Raw>

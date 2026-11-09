@@ -5,6 +5,54 @@
 
 ---
 
+## v1.0.3 — 2026-11-09
+
+**定位**：按反馈把右侧 B站部件从「音乐区排行榜 + 视频画面」改成 **「输入关键词搜索 → 手动点选 → 只播放声音、不显示画面」**。左侧 9 源热榜、双栏布局、导航位置全部不变。组件层 + 配置层同时改动：**必须换镜像，且必须同步三个配置文件**。
+
+> v1.0.2 条目里「B站没有公开音频流接口、未做音频流代理」的已知限制，本版已通过服务端同源代理解决。
+
+### 变更
+
+| 模块 | 内容 |
+|---|---|
+| 搜索 | `bilibili_music.js` 从音乐区排行榜改为 B站视频搜索：`api.bilibili.com/x/web-interface/wbi/search/type?search_type=video`（完整浏览器 UA 下**免登录**可用，容器内实测 `code=0` / 每页 20 条）。服务端剥离标题里的 `<em class="keyword">` 高亮标签与 HTML 实体，`bvid` 白名单校验、去重、上限 20 条，链接一律由服务端拼接；按「关键词 + 页码」独立缓存 10 分钟，手动刷新 `force=1` 可跳过（保留 60 秒最小间隔防风控） |
+| 纯音频代理 | 新增 `/api/widgets/bilibili_audio`：`wbi/view` 取 `cid` → `playurl(fnval=16)` 取 DASH 音轨（免登录 3 档，自动选最高 184kbps 的 fMP4）→ 带 `Referer: https://www.bilibili.com/` **流式转发**给同源浏览器，透传 Range / 206 / Content-Range 以支持拖动进度。B站 CDN 对第三方 / 空 Referer 一律 403，所以浏览器不能直连，必须走容器代理 |
+| 播放交互 | 页面里只有 `<audio controls>` + 音轨信息条 + 上一个 / 下一个 / 返回结果，**没有 iframe、没有封面、没有任何视频画面**；播放结束自动切下一首；音频加载失败给出提示；点击条目后才挂载 `<audio>`，符合浏览器自动播放策略 |
+| 搜索体验 | 搜索框、最近搜索词（浏览器本地）、4 个示例关键词、结果分页（最多 10 页）、重新搜索按钮；未搜索时只显示输入提示，不请求上游、不自动出榜单 |
+| 安全与隐私 | 关键词收敛（去控制字符 / 压缩空白 / ≤60 字）、页码 clamp 1–10、上游地址写死、`bvid` 白名单、CDN 域名后缀白名单（防 SSRF）、音轨地址只收 HTTPS、接口只放行 GET/HEAD；音频流由容器代理，浏览器不直连 B站 CDN，访客 IP / Referer 不暴露给 B站 |
+| 兼容性 | widget key 沿用 `bilibili_music`、组件路径与 CSS 选择器不变，已部署的用户只换镜像也不会出现 `Missing`；`custom.js` 的双栏测量逻辑无需改动 |
+| 配置模板 | `widgets.yaml`：`label: B站音乐`、`refreshInterval: 600000`；`custom.css` 新增搜索表单 / 最近搜索 / 分页 / 音频条样式，移除 iframe 播放器样式；三副本 sha256 一致 |
+| 测试 | 新增 / 重写：搜索 API 12 例、音频代理 API 9 例、部件组件 12 例，连同 9 源热榜的 API 12 例 + 组件 9 例，本版定向 **54/54 通过**、定向 ESLint 0 错误 |
+
+### 升级 / 兼容性
+
+1. **必须换镜像**：`:v1.0.3`（或离线导入 `homepage-image-v1.0.3.tar`），先删 NAS 旧镜像再拉。
+2. **必须同步三个配置文件**：`widgets.yaml` / `custom.js` / `custom.css`。最省事是备份 `custom.js` 的壁纸图源后删掉这三个文件，重启容器由内置 skeleton 自动补齐；**`bookmarks.yaml` 千万别删**。
+3. **Ctrl+F5**。
+4. 自检：
+   - `/api/widgets/bilibili_music?index=4&q=%E6%99%B4%E5%A4%A9` → `query: "晴天"`、`items` ≤20、条目带 `bvid` / `rank` / `link`；
+   - `/api/widgets/bilibili_audio?bvid=BV1BZbSzZEGT` → `206` 或 `200`、`Content-Type: audio/mp4`（非法 bvid 返回 400）；
+   - 页面右侧显示搜索框，选中结果后出现音频控制条，DOM 里没有 `iframe`。
+5. `settings.yaml` / `services.yaml` / `bookmarks.yaml` 不用动；compose 里的 `HOMEPAGE_NEWS_SOURCES` / `HOMEPAGE_NEWS_FEEDS` 仍建议删掉。
+
+### 已知限制
+
+- 音频流经过容器转发，播放期间会占用 NAS 的出网带宽（184kbps 档约 6 MB / 首 4 分钟曲目）；多人同时播放时按人数倍增。
+- 免登录只能拿到 B站提供的 3 档 AAC 音轨（最高约 184kbps）；Hi-Res / 杜比 / 无损需要 `SESSDATA` 登录态，本版未做（也不需要账号）。
+- 少数视频没有独立 DASH 音轨或已下架，会显示「音频加载失败」；换一条结果即可。
+- 浏览器可能仍拦截带声音的自动播放：`<audio>` 是在用户点击后才挂载的，绝大多数浏览器会放行；万一被拦，手动点一下音频控件里的播放键。
+- B站 CDN 强制校验 Referer，这是必须走服务端代理的原因；若上游改版（接口 / CDN 域名 / 签名策略），只需调整镜像里的解析与白名单，配置文件不用动。
+- 全量 ESLint + Vitest 按此前取消未重跑；本版以定向测试 + 容器内真实链路冒烟为准。
+
+### 发布坐标
+
+- 镜像：`boyu233/homepage-bookmark-manager:v1.0.3` = `:latest` = `:sha-PENDING_SHA`
+- Digest：`PENDING_DIGEST`（`linux/amd64`，Registry API 核验）
+- 代码：commit `PENDING_SHA`、git tag `v1.0.3`，分支 `dev` / `feat/bookmark-manager`
+- 离线镜像：`homepage-image-v1.0.3.tar`（`docker load` 导入）
+
+---
+
 ## v1.0.2 — 2026-11-09
 
 **定位**：首页新增「B站音乐榜」部件（榜单 + 官方播放器内嵌播放），百度热搜与音乐榜改为左右并排；热榜部件升级为 **9 源标签切换**（百度 / 微博 / 知乎 / 头条 / 抖音 / B站热搜 + Bing / IT之家 / 少数派资讯）。组件层 + 配置层同时改动：**必须换镜像，且必须同步三个配置文件**。

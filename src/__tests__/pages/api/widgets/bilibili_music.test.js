@@ -10,26 +10,25 @@ vi.mock("utils/config/widget-helpers", () => ({ getPrivateWidgetOptions: getOpti
 vi.mock("utils/logger", () => ({ default: () => loggerMock }));
 
 const FIRST = {
-  bvid: "BV17VZpY1ENA",
-  title: "给我们的组合起个名！",
-  tname: "翻唱",
-  duration: 15,
-  pubdate: 1743423401,
-  owner: { name: "田一名sir" },
-  stat: { view: 17882158, like: 1535728 },
+  bvid: "BV1BZbSzZEGT",
+  title: "【无损音质】《<em class=\"keyword\">晴天</em>》- <em class=\"keyword\">周杰伦</em> &amp; 朋友",
+  author: "VV音乐局",
+  duration: "4:30",
+  play: 3460783,
+  pubdate: 1753667700,
+  arcurl: "http://evil.example/av1",
 };
 const SECOND = {
-  bvid: "BV1GJ411x7h7",
-  title: "第二首歌",
-  tname: "原创音乐",
-  duration: 215,
-  pubdate: 1743423500,
-  owner: { name: "某UP主" },
-  stat: { view: 9800, like: 320 },
+  bvid: "BV1d4411N7zD",
+  title: "【4K修复】晴天 MV",
+  author: "某UP主",
+  duration: "1:02:05",
+  play: 9800,
+  pubdate: 1560167152,
 };
 
-function ranking(list = [FIRST, SECOND], overrides = {}) {
-  return { code: 0, message: "OK", data: { note: "音乐区排行", list }, ...overrides };
+function search(result = [FIRST, SECOND], overrides = {}) {
+  return { code: 0, message: "OK", data: { numResults: 1000, result }, ...overrides };
 }
 
 function makeRes() {
@@ -52,160 +51,182 @@ async function loadHandler() {
   return (await import("pages/api/widgets/bilibili_music")).default;
 }
 
-async function call(handler, query = { index: "4" }) {
+async function call(handler, query = { index: "4", q: "周杰伦 晴天" }) {
   const res = makeRes();
   await (handler || (await loadHandler()))({ query }, res);
   return res;
 }
 
-describe("pages/api/widgets/bilibili_music — B站音乐区排行榜", () => {
+describe("pages/api/widgets/bilibili_music — B站视频搜索", () => {
   beforeEach(() => {
     getOptionsMock.mockReset();
     getOptionsMock.mockResolvedValue({});
     loggerMock.error.mockReset();
-    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ranking() }));
+    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => search() }));
   });
 
-  it("固定请求音乐区排行，解析出排名/标题/UP主/时长/播放数并白名单拼接链接", async () => {
-    const res = await call();
+  it("没有关键词时不请求上游，返回空结果", async () => {
+    const res = await call(await loadHandler(), { index: "4" });
     expect(res.code).toBe(200);
     expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "private, no-store");
     expect(getOptionsMock).toHaveBeenCalledWith("bilibili_music", "4");
-    expect(res.payload.feedNames).toEqual(["B站音乐榜"]);
-    expect(res.payload.boardName).toBe("音乐榜");
-    expect(res.payload.total).toBe(2);
+    expect(res.payload).toMatchObject({ query: "", page: 1, items: [] });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("固定请求搜索端点，关键词/页码编码，并带完整浏览器 UA", async () => {
+    const res = await call();
+    expect(res.code).toBe(200);
+    expect(res.payload.query).toBe("周杰伦 晴天");
+    expect(res.payload.page).toBe(1);
+    expect(res.payload.total).toBe(1000);
     expect(res.payload.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(res.payload.items[0]).toMatchObject({
-      rank: 1,
-      bvid: "BV17VZpY1ENA",
-      title: "给我们的组合起个名！",
-      author: "田一名sir",
-      category: "翻唱",
-      duration: 15,
-      view: 17882158,
-      like: 1535728,
-      link: "https://www.bilibili.com/video/BV17VZpY1ENA",
-    });
-    expect(res.payload.items[1].rank).toBe(2);
     expect(global.fetch).toHaveBeenCalledWith(
-      "https://api.bilibili.com/x/web-interface/ranking/v2?rid=3&type=all",
+      "https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=video&keyword=%E5%91%A8%E6%9D%B0%E4%BC%A6+%E6%99%B4%E5%A4%A9&page=1",
       expect.objectContaining({
         headers: expect.objectContaining({
-          Referer: "https://www.bilibili.com/",
+          Referer: "https://search.bilibili.com/",
           "User-Agent": expect.stringContaining("AppleWebKit"), // 简写 UA 会被 B站风控 -352
         }),
       }),
     );
   });
 
-  it("过滤非法 bvid、缺标题、重复项，链接不接受上游 URL", async () => {
+  it("解析搜索结果：剥离高亮标签/HTML 实体，时长转秒，链接按 bvid 白名单拼接", async () => {
+    const res = await call();
+    expect(res.payload.items[0]).toMatchObject({
+      rank: 1,
+      bvid: "BV1BZbSzZEGT",
+      title: "【无损音质】《晴天》- 周杰伦 & 朋友",
+      author: "VV音乐局",
+      duration: 270,
+      view: 3460783,
+      pubdate: 1753667700,
+      link: "https://www.bilibili.com/video/BV1BZbSzZEGT",
+    });
+    expect(res.payload.items[1]).toMatchObject({ rank: 2, duration: 3725, link: "https://www.bilibili.com/video/BV1d4411N7zD" });
+    // 上游 arcurl / url 一律不透传
+    expect(JSON.stringify(res.payload)).not.toContain("evil.example");
+  });
+
+  it("过滤非法 bvid、缺标题、重复项", async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,
       status: 200,
       json: async () =>
-        ranking([
+        search([
           { ...FIRST, bvid: "javascript:alert(1)" },
           { ...FIRST, title: "   " },
-          { ...FIRST, bvid: "BV17VZpY1ENA", link: "http://evil.example/x" },
-          { ...FIRST, bvid: "BV17VZpY1ENA" },
+          { ...FIRST, bvid: "BV1BZbSzZEGT" },
           SECOND,
         ]),
     }));
     const res = await call();
     expect(res.payload.items).toHaveLength(2);
-    expect(res.payload.items[0].link).toBe("https://www.bilibili.com/video/BV17VZpY1ENA");
     expect(res.payload.items[0].rank).toBe(1);
     expect(res.payload.items[1].rank).toBe(2);
   });
 
-  it("最多返回 50 条", async () => {
-    const many = Array.from({ length: 60 }, (_, i) => ({
+  it("每页最多 20 条", async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
       ...FIRST,
       bvid: `BV${String(i).padStart(10, "0")}`,
-      title: `歌曲 ${i}`,
+      title: `视频 ${i}`,
     }));
-    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ranking(many) }));
+    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => search(many) }));
     const res = await call();
-    expect(res.payload.items).toHaveLength(50);
-    expect(res.payload.total).toBe(60);
+    expect(res.payload.items).toHaveLength(20);
+    expect(res.payload.total).toBe(1000);
   });
 
-  it("缓存有效期内复用，不重复请求上游", async () => {
+  it("相同关键词+页码复用缓存，不同关键词/页码分别请求", async () => {
     const handler = await loadHandler();
-    await call(handler, { index: "4", refreshInterval: "86400000" });
-    await call(handler, { index: "4", refreshInterval: "86400000" });
+    const q = { index: "4", q: "晴天", refreshInterval: "600000" };
+    await call(handler, q);
+    await call(handler, q);
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(getOptionsMock).toHaveBeenCalledTimes(2);
+
+    await call(handler, { ...q, q: "夜曲" });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    await call(handler, { ...q, page: "2" });
+    expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
-  it("cacheTTL 默认 24 小时，并把配置 clamp 到 1 分钟 ~ 7 天", async () => {
+  it("cacheTTL 默认 10 分钟，clamp 到 1 分钟 ~ 24 小时", async () => {
     const { cacheTTL } = await import("pages/api/widgets/bilibili_music");
-    expect(cacheTTL(undefined)).toBe(24 * 60 * 60 * 1000);
-    expect(cacheTTL("86400000")).toBe(24 * 60 * 60 * 1000);
+    expect(cacheTTL(undefined)).toBe(10 * 60 * 1000);
+    expect(cacheTTL("600000")).toBe(10 * 60 * 1000);
     expect(cacheTTL(1000)).toBe(60 * 1000);
-    expect(cacheTTL(100 * 24 * 60 * 60 * 1000)).toBe(7 * 24 * 60 * 60 * 1000);
-    expect(cacheTTL("not-a-number")).toBe(24 * 60 * 60 * 1000);
+    expect(cacheTTL(100 * 24 * 60 * 60 * 1000)).toBe(24 * 60 * 60 * 1000);
+    expect(cacheTTL("not-a-number")).toBe(10 * 60 * 1000);
   });
 
-  it("默认 24 小时缓存：24 小时内不重拉，超过后自动重拉", async () => {
+  it("缓存过期后自动重拉", async () => {
     vi.useFakeTimers();
     try {
       const handler = await loadHandler();
-      const query = { index: "4", refreshInterval: "86400000" };
-      await call(handler, query);
-      vi.setSystemTime(Date.now() + 23 * 60 * 60 * 1000);
-      await call(handler, query);
+      const q = { index: "4", q: "晴天", refreshInterval: "600000" };
+      await call(handler, q);
+      vi.setSystemTime(Date.now() + 9 * 60 * 1000);
+      await call(handler, q);
       expect(global.fetch).toHaveBeenCalledTimes(1);
-
-      vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
-      await call(handler, query);
+      vi.setSystemTime(Date.now() + 2 * 60 * 1000);
+      await call(handler, q);
       expect(global.fetch).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("手动刷新 force=1 跳过 24 小时缓存，但 60 秒内仍受最小间隔保护", async () => {
+  it("force=1 跳过缓存，但 60 秒内仍受最小间隔保护", async () => {
     vi.useFakeTimers();
     try {
       const handler = await loadHandler();
-      await call(handler, { index: "4", refreshInterval: "86400000" });
-      await call(handler, { index: "4", refreshInterval: "86400000", force: "1" });
+      const q = { index: "4", q: "晴天", refreshInterval: "600000" };
+      await call(handler, q);
+      await call(handler, { ...q, force: "1" });
       expect(global.fetch).toHaveBeenCalledTimes(1);
-
       vi.setSystemTime(Date.now() + 61 * 1000);
-      await call(handler, { index: "4", refreshInterval: "86400000", force: "1" });
+      await call(handler, { ...q, force: "1" });
       expect(global.fetch).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("上游 HTTP 失败时返回空列表与错误标记，并记录日志", async () => {
-    global.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
-    const res = await call();
-    expect(res.code).toBe(200);
-    expect(res.payload.items).toEqual([]);
-    expect(res.payload.error).toBe("音乐榜暂不可用");
-    expect(loggerMock.error).toHaveBeenCalled();
-  });
-
-  it("B站风控返回非 0 code 时同样降级", async () => {
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ code: -352, message: "风控校验失败" }),
-    }));
+  it("空搜索结果是正常业务结果，不降级报错", async () => {
+    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => search([]) }));
     const res = await call();
     expect(res.payload.items).toEqual([]);
-    expect(res.payload.error).toBe("音乐榜暂不可用");
+    expect(res.payload.error).toBeUndefined();
+    expect(loggerMock.error).not.toHaveBeenCalled();
   });
 
-  it("榜单为空或结构异常时降级，不抛出", async () => {
-    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ranking([]) }));
-    expect((await call()).payload.error).toBe("音乐榜暂不可用");
+  it("上游 HTTP 失败 / 风控 code != 0 / 结构异常时降级为空列表", async () => {
+    global.fetch = vi.fn(async () => ({ ok: false, status: 412, json: async () => ({}) }));
+    expect((await call()).payload).toMatchObject({ items: [], error: "搜索暂不可用" });
+
+    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ code: -352, message: "风控校验失败" }) }));
+    expect((await call()).payload.error).toBe("搜索暂不可用");
+
     global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) }));
-    expect((await call()).payload.error).toBe("音乐榜暂不可用");
-    expect(loggerMock.error).toHaveBeenCalled();
+    expect((await call()).payload.error).toBe("搜索暂不可用");
+    expect(loggerMock.error).toHaveBeenCalledTimes(3);
+  });
+
+  it("normalizeQuery / normalizePage / cleanText / parseDuration 边界", async () => {
+    const { normalizeQuery, normalizePage, cleanText, parseDuration } = await import("pages/api/widgets/bilibili_music");
+    expect(normalizeQuery("  周杰伦\t晴天  ")).toBe("周杰伦 晴天");
+    expect(normalizeQuery("x".repeat(100))).toHaveLength(60);
+    expect(normalizeQuery(["周杰伦", "晴天"])).toBe("周杰伦");
+    expect(normalizeQuery(undefined)).toBe("");
+    expect(normalizePage("3")).toBe(3);
+    expect(normalizePage("999")).toBe(10);
+    expect(normalizePage("abc")).toBe(1);
+    expect(cleanText('<em class="keyword">A</em> &amp; B&nbsp;C')).toBe("A & B C");
+    expect(parseDuration("4:30")).toBe(270);
+    expect(parseDuration("1:02:05")).toBe(3725);
+    expect(parseDuration(215)).toBe(215);
+    expect(parseDuration(undefined)).toBe(0);
   });
 });

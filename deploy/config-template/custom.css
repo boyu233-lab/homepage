@@ -431,12 +431,12 @@ input[placeholder*="搜索"]:focus {
   }
 }
 
-/* ============ 首页视图:搜索框 / 大时间 / 双栏榜单 ============
+/* ============ 首页视图:搜索框 / 大时间 / 双栏面板 ============
    由 custom.js 在选中「首页」时给 body 加 .home-view。
    DOM 节点保持 React 原样,只改排布:搜索与时间跨整行,
-   热搜榜与 B站音乐榜各占一列,窄屏回落为上下堆叠。 */
+   左侧多源热搜、右侧 B站搜索播放各占一列,窄屏回落为上下堆叠。 */
 
-/* 非首页分组:时间、热搜、音乐榜不显示,顶部信息条只留资源与搜索框 */
+/* 非首页分组:时间、热搜、B站搜索不显示,顶部信息条只留资源与搜索框 */
 body:not(.home-view) .information-widget-datetime,
 body:not(.home-view) .information-widget-news,
 body:not(.home-view) .information-widget-bilibili_music {
@@ -464,7 +464,7 @@ body.home-view #widgets-wrap > div:not(#information-widgets-right) {
   transform-origin: top left;
 }
 
-/* 改成两列网格:搜索框与时间跨整行,热搜 / 音乐各占一列 */
+/* 改成两列网格:搜索框与时间跨整行,热搜 / B站搜索各占一列 */
 body.home-view #information-widgets-right {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -509,7 +509,7 @@ body.home-view .information-widget-datetime span {
   text-shadow: 0 3px 22px rgba(124, 58, 237, 0.5);
 }
 
-/* ③ 热搜 + B站音乐:时间下方左右并排,整份列表直接铺开(无下拉浮层) */
+/* ③ 热搜 + B站搜索:时间下方左右并排,整份列表直接铺开(无下拉浮层) */
 body.home-view .information-widget-news,
 body.home-view .information-widget-bilibili_music {
   width: 100% !important;
@@ -655,7 +655,7 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
   color: rgba(214, 204, 255, 0.7);
 }
 
-/* ============ B站音乐榜部件 ============ */
+/* ============ B站搜索播放部件（v1.0.3 起） ============ */
 .bili-widget {
   font-size: 0.85rem;
 }
@@ -663,8 +663,8 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
 .bili-toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -684,15 +684,141 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
+  margin-left: auto;
   padding: 4px;
   border-radius: 999px;
   color: #cfc6f5;
   cursor: pointer;
 }
 
-.bili-refresh:hover {
+.bili-refresh:hover:not(:disabled) {
   background: rgba(124, 58, 237, 0.35);
   color: #fff;
+}
+
+.bili-refresh:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 搜索表单：关键词由用户主动输入，部件不再自动抓榜单 */
+.bili-search-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.bili-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(28, 22, 55, 0.45);
+  color: #efeaff;
+  font: inherit;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.bili-search-input::placeholder {
+  color: rgba(214, 204, 255, 0.45);
+}
+
+.bili-search-input:focus {
+  border-color: rgba(196, 181, 253, 0.75);
+}
+
+.bili-search-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(124, 58, 237, 0.5);
+  color: #fff;
+  cursor: pointer;
+}
+
+.bili-search-btn:hover {
+  background: rgba(124, 58, 237, 0.8);
+}
+
+/* 最近搜索 / 示例关键词：仅作快捷入口，不自动请求上游 */
+.bili-recent,
+.bili-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.bili-recent-label,
+.bili-suggest > span {
+  flex: none;
+  font-size: 0.68rem;
+  color: rgba(214, 204, 255, 0.5);
+}
+
+.bili-recent button,
+.bili-suggest button {
+  flex: none;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(28, 22, 55, 0.42);
+  color: #cfc6f5;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.bili-recent button:hover,
+.bili-suggest button:hover {
+  background: rgba(124, 58, 237, 0.45);
+  border-color: rgba(196, 181, 253, 0.65);
+  color: #fff;
+}
+
+/* 分页 */
+.bili-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bili-pager button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(28, 22, 55, 0.42);
+  color: #cfc6f5;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.bili-pager button:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.4);
+  color: #fff;
+}
+
+.bili-pager button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .bili-list {
@@ -782,7 +908,16 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
   color: rgba(214, 204, 255, 0.7);
 }
 
-/* 播放器视图:替换榜单(不叠加),两栏高度保持稳定 */
+/* 起始态撑到与左侧热搜相近的高度，避免右栏空荡 */
+.bili-empty-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 190px;
+  line-height: 1.8;
+}
+
+/* 播放视图:替换搜索结果(不叠加),两栏高度保持稳定 */
 .bili-player {
   width: 100%;
 }
@@ -828,13 +963,62 @@ body.home-view .information-widget-bilibili_music > .bili-widget {
   padding: 0;
 }
 
-.bili-player-frame {
+/* 纯音频播放：只有音轨信息与原生 <audio> 控件，不显示任何视频画面 */
+.bili-audio-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.28), rgba(28, 22, 55, 0.42));
+}
+
+.bili-audio-art {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: rgba(124, 58, 237, 0.55);
+  color: #fff;
+}
+
+.bili-audio-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bili-audio-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  color: #efeaff;
+}
+
+.bili-audio-el {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  border: 0;
+  height: 38px;
+  margin-top: 10px;
   border-radius: 8px;
-  background: #000;
+  color-scheme: dark;
+}
+
+.bili-audio-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.18);
 }
 
 .bili-player-controls {
