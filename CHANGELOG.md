@@ -37,11 +37,14 @@
 ### 测试与验收
 
 - 定向 Vitest 27/27（工具 10 + API 8 + 组件 3 + 自定义资源 6）；全量 Vitest **587 文件 / 2100 用例全通过**；全量 ESLint 0 错误。
-- 容器内冒烟：（待回填）
+- **容器内真实冒烟**（`:v1.2.0`，挂载配置目录 + 开启登录）：**25/25 全通过** —— 匿名 GET/POST 上传接口 401、`/manage` 307、`no-cache` + Next 原生 ETag 与普通条件请求 304；登录后列表 9 文件 / maxBytes 524288；validate 合法 200 / 结构错误 400；上传 `custom.css` 返回 200 + `.bak`、内容立即更新、ETag 与 `/api/hash` 同步变化；白名单外文件名 400、顶层结构不符 400（磁盘不变）、跨站 403、下载 200 + attachment、按备份名回滚 200 且原文逐字恢复、非法备份名 400、写限流出现 429。
 
 ### 发布坐标
 
-（待回填）
+- 镜像 `:v1.2.0` = `:latest` = `:sha-06d0bc4`，digest `sha256:63944f17bb5002d86a43f6921cc85018543908d130a2cd0061db9fdc440f7602`（Registry API 三标签核验一致）。
+- 代码 commit `06d0bc4`，git tag `v1.2.0` 指向该提交；`dev` / `feat/bookmark-manager` 已同步推送。文档坐标回填为独立 commit。
+- 离线镜像 `homepage-image-v1.2.0.tar`（81MB，sha256 `8986956cfb3023bd11d37efb5a577d3c09deebaf6bcd5718b7920660dd717bcb`）。
+- 交付 `homepage-v1.2.0-升级包.zip`（刻意不含配置文件）、`homepage-v1.2.0-变更说明.html`。
 
 ### 已知限制
 
