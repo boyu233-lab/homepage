@@ -9,6 +9,7 @@ import { isAuthEnabled } from "utils/env";
  *
  * 不放行（必须登录）的敏感端点：
  *   /api/config/bookmarks  —— 管理页读写接口（含原始 YAML 源码）
+ *   /api/config/upload     —— 配置上传 / 下载 / 回滚接口（v1.2.0）
  *   /api/services/proxy    —— 会转发到配置中的内网服务
  *   /api/revalidate        —— 触发配置重载（有副作用）
  *   /api/mcp               —— MCP 管理面
@@ -41,7 +42,13 @@ const PUBLIC_READ_PREFIXES = [
   "/api/search/searchSuggestion",
 ];
 
-const RESERVED_PATHS = ["/api/config/bookmarks", "/api/services/proxy", "/api/revalidate", "/api/mcp"];
+const RESERVED_PATHS = [
+  "/api/config/bookmarks",
+  "/api/config/upload",
+  "/api/services/proxy",
+  "/api/revalidate",
+  "/api/mcp",
+];
 
 function normalizePath(pathname) {
   let value = pathname;

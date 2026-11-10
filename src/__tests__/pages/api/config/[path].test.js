@@ -69,6 +69,20 @@ describe("pages/api/config/[path]", () => {
     expect(res.body).toBe("body{}");
   });
 
+  it("sets no-cache so an uploaded stylesheet is never served stale", async () => {
+    fs.existsSync.mockReturnValueOnce(true);
+    fs.readFileSync.mockReturnValueOnce("body{}");
+
+    const res = createMockRes();
+    await handler({ query: { path: "custom.css" } }, res);
+
+    expect(res.headers["Cache-Control"]).toBe("no-cache, must-revalidate");
+    expect(res.headers["Content-Type"]).toBe("text/css");
+    expect(res.body).toBe("body{}");
+    // ETag / 304 由 Next.js 的 res.send 原生提供，本 handler 不重复设置
+    expect(res.headers.ETag).toBeUndefined();
+  });
+
   it("logs and returns 500 when reading the file throws", async () => {
     fs.existsSync.mockReturnValueOnce(true);
     fs.readFileSync.mockImplementationOnce(() => {

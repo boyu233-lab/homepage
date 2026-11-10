@@ -578,7 +578,7 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ---
 
-## 6.10 v1.1.0：安全与发布硬化（2026-11-10，当前）
+## 6.10 v1.1.0：安全与发布硬化（2026-11-10）
 
 ### 这一版改了什么
 
@@ -683,6 +683,68 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "x-prerender-revalidate: anything" h
 | 启动日志出现「NEXTAUTH_SECRET 疑似占位符」 | 用 `openssl rand -base64 32` 重新生成并重启；别把占位符带到公网 |
 | 忘记密码被锁 5 分钟 | 等 5 分钟，或重启容器清空内存计数（不影响书签） |
 | 从别的域名嵌入播放报 403 | 把该域名填进 `HOMEPAGE_PUBLIC_ORIGINS` |
+
+---
+
+## 6.11 v1.2.0：网页上传配置，不用再拉镜像（2026-11-10，当前）
+
+### 这一版改了什么
+
+管理页多了第三个页签「配置更新」。登录后直接把配置文件拖进网页上传，服务端校验 → 备份 → 原子写 → 清缓存，首页自动刷新。**以后改书签、样式、部件配置都不用拉镜像、不用进群晖文件管理器、不用重启容器。**
+
+| 项 | 说明 |
+|---|---|
+| 可上传文件 | 9 个：`settings.yaml` / `services.yaml` / `bookmarks.yaml` / `widgets.yaml` / `docker.yaml` / `kubernetes.yaml` / `proxmox.yaml` / `custom.css` / `custom.js`，文件名必须保持原样 |
+| 批量上传 | 支持多选 / 拖拽；升级包解压后全选即可一次覆盖多个文件 |
+| 上传前校验 | YAML 语法 + 顶层结构（防止把 bookmarks 传成 widgets）、单文件 512KB 上限、拒绝二进制内容；不合法就不写盘 |
+| 自动备份 | 写盘前生成 `<文件名>.<时间戳>.bak`，每个文件保留最近 10 份；页面里可下载留档、一键回滚（回滚前再备份当前内容） |
+| 立即生效 | 写后清 `dashboard` 内存缓存；首页通过 `/api/hash` 自动刷新；`custom.css` / `custom.js` 加了 `no-cache`（Next.js 自带内容 ETag / 304），不会被浏览器旧缓存挡住 |
+| 安全 | 必须登录；显式同源校验防 CSRF；写请求每 IP 限 30 次/分钟；文件名固定白名单，杜绝路径穿越 |
+
+> ⚠️ **本次升级仍要换一次镜像**（新增 API 与页面，属于 `src/` 代码改动）。换完之后，日常配置改动就再也不用拉镜像了。
+
+### 升级步骤（**只换镜像，一个配置文件都不用覆盖**）
+
+1. 把 compose 的 image 改成 `boyu233/homepage-bookmark-manager:v1.2.0`（或导入 `homepage-image-v1.2.0.tar`）。
+2. **不要覆盖** `custom.css` / `custom.js` / `widgets.yaml` / `bookmarks.yaml` / `settings.yaml`，保持原样。新增环境变量都是可选的，不配即用默认。
+3. 重建项目 → 登录 → 首页右下「管理书签」→ 切到「配置更新」页签，能看到 9 个文件列表即升级成功。
+4. **回滚**：镜像 tag 改回 `:v1.1.0`。上传产生的 `.bak` 备份留在配置目录里，不影响回滚。
+
+### 日常用法
+
+1. 在本机准备好要改的文件（或直接解压升级包），**文件名保持 `custom.css` / `widgets.yaml` 等原名**。
+2. 浏览器打开 `http://<NAS>:3000/manage`（未登录会跳登录页）→「配置更新」。
+3. 拖进去或点「选择文件（可多选）」→ 页面逐文件显示 ✓ / ✕ 校验结果 → 点「上传并应用」。
+4. 结果里会显示每个文件的备份名；首页会自动刷新。若样式看起来没变，按一次 **Ctrl+F5**。
+5. 改错了：在「备份与回滚」区找到上传前那个 `.bak`，点「回滚」。
+
+> 书签 YAML 损坏导致管理页报「书签加载失败」时，可直接访问 `/manage?tab=files` 进入配置更新页上传修复。
+
+### 可选参数
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `HOMEPAGE_CONFIG_UPLOAD_MAX_BYTES` | `524288` | 单文件字节上限，硬上限 2MB |
+| `HOMEPAGE_CONFIG_WRITE_LIMIT` | `30` | 每 IP 每分钟写请求（上传 / 校验 / 回滚）次数 |
+
+### 自检（把地址换成自己的）
+
+```bash
+# 未登录访问上传接口必须 401
+curl -s -o /dev/null -w "%{http_code}\n" http://<NAS>:3000/api/config/upload
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://<NAS>:3000/api/config/upload \
+  -H 'Content-Type: application/json' -d '{"file":"custom.css","content":"body{}"}'
+```
+
+### 排错
+
+| 现象 | 原因 / 处理 |
+|---|---|
+| 提示「文件名不在允许列表内」 | 上传时改过名（如 `custom (1).css`）；改回 9 个原始文件名之一 |
+| 提示「顶层应为数组 / 对象」 | 传错文件了，例如把 `bookmarks.yaml` 的内容传成了 `widgets.yaml` |
+| 上传成功但样式没变 | 浏览器缓存，Ctrl+F5 强刷；`kubernetes.yaml` / `proxmox.yaml` 不在 hash 列表，改这两个需手动刷新 |
+| 上传后 429 | 触发写限流，调大 `HOMEPAGE_CONFIG_WRITE_LIMIT` 或等一分钟 |
+| 想批量上传升级包 | 先解压，再在「选择文件」里全选解压出的配置文件（不支持直接传 zip） |
 
 ---
 
@@ -828,5 +890,6 @@ docker.1ms.run/boyu233/homepage-bookmark-manager:latest
 - [ ] **（v1.1.0 新增）反向代理覆盖 `X-Forwarded-For`**（`proxy_set_header X-Forwarded-For $remote_addr;`），否则公开读限流可被伪造头绕过
 - [ ] **（v1.1.0 新增）`NEXTAUTH_SECRET` 不是 `CHANGE_ME` / 测试值 / 重复字符**；生产建议设 `HOMEPAGE_REQUIRE_STRONG_SECRET=true`
 - [ ] **（v1.1.0 新增）若启用 MCP**：token ≥32 位、只限内网访问、`HOMEPAGE_MCP_ALLOW_WRITE` 默认保持 `false`；token 能读到 `services.yaml` 里的凭据
+- [ ] **（v1.2.0 新增）配置上传接口保持仅登录可用**：`HOMEPAGE_PUBLIC_READ_PATHS` 不要加 `/api/config/upload`（已在代码里列为保留路径），也不要把 `/manage` 无鉴权暴露到公网；上传前先下载一份配置留档
 
 更完整的验收矩阵与安全说明见 [`群晖部署清单.md`](./群晖部署清单.md)。

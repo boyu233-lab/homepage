@@ -5,6 +5,52 @@
 
 ---
 
+## v1.2.0 — 2026-11-10
+
+**定位**：配置热更新（网页上传文件）。管理页新增「配置更新」页签，登录后可直接上传 9 个配置文件，服务端自动校验、备份、原子写并清缓存，首页自动刷新。**本次改的是 `src/` 下的 API 与页面，必须换一次镜像；换完之后日常改书签、样式、部件配置全部走网页上传，不再拉镜像、不再 SSH 覆盖文件、不用重启容器。** 所有既有配置文件一个都不用覆盖。
+
+### 变更
+
+| 模块 | 内容 |
+|---|---|
+| 通用工具 | 新增 `src/utils/config/upload.js`：与 MCP 一致的 9 文件白名单（`settings` / `services` / `bookmarks` / `widgets` / `docker` / `kubernetes` / `proxmox.yaml` + `custom.css` / `custom.js`）；目标路径只由固定表拼接，杜绝 `../` 穿越；校验 YAML 语法与顶层结构（拦截把 bookmarks 传成 widgets 的误操作）、体积上限、二进制混入；写盘前按文件生成时间戳备份并各保留最近 10 份；临时文件 + rename 原子替换；按备份名一键回滚（回滚前再备份当前内容） |
+| API | 新增 `/api/config/upload`：`GET` 列表 / 下载 / 读原文，`POST` `validate` / `upload` / `restore`；`withAuth` 要求登录、显式同源校验防 CSRF、写操作限流 30 次/分钟；写后调用 `invalidateDashboardData()` 清掉首页数据缓存 |
+| 管理页 | 新增 `src/components/manage/config-updater.jsx`：拖拽 / 多选上传（升级包解压后全选即可）、上传前逐文件校验预览、批量上传结果、下载当前配置留档、备份列表与一键回滚；`manage.jsx` 增加第三个页签，并支持 `/manage?tab=files` 直达（书签 YAML 损坏时仍能进配置页修复） |
+| 缓存 | `src/pages/api/config/[path].js` 为 `custom.css` / `custom.js` 增加 `Cache-Control: no-cache, must-revalidate`（Next.js 自带基于内容的 ETag 与 304 由框架处理），保证上传后首页 `location.reload()` 拿到的是新样式 / 脚本，不被浏览器启发式缓存挡住 |
+| 文档 | 部署文档新增 6.11 节、兼容矩阵新增 v1.2.0 行、`config-template/README.md` 增加网页上传说明 |
+
+### 新增环境变量（全部可选，不设即用默认）
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `HOMEPAGE_CONFIG_UPLOAD_MAX_BYTES` | `524288`（512KB） | 单文件字节上限，硬上限 2MB（与 API bodyParser 对齐） |
+| `HOMEPAGE_CONFIG_WRITE_LIMIT` | `30` | 每个 IP 每分钟允许的写请求（上传 / 校验 / 回滚）次数 |
+
+### 升级规则（重要）
+
+- **本次必须换镜像**（新增 API 与页面），镜像 tag 改 `:v1.2.0`。
+- **不用覆盖任何配置文件**：`custom.css` / `custom.js` / `widgets.yaml` / `bookmarks.yaml` / `settings.yaml` 全部保持原样。
+- **以后改配置**：登录 → 首页右下「管理书签」→「配置更新」→ 选文件 → 上传并应用；不用再拉镜像、不用进群晖文件管理器、不用重启容器。
+- **只有升级程序代码**（`src/` 下的 React / API）才需要换镜像。
+- 回滚：镜像 tag 改回 `:v1.1.0`；上传产生的 `.bak` 备份仍在配置目录，不影响回滚。
+
+### 测试与验收
+
+- 定向 Vitest 27/27（工具 10 + API 8 + 组件 3 + 自定义资源 6）；全量 Vitest **587 文件 / 2100 用例全通过**；全量 ESLint 0 错误。
+- 容器内冒烟：（待回填）
+
+### 发布坐标
+
+（待回填）
+
+### 已知限制
+
+- 上传目标固定为 9 个已知配置文件，不接受任意文件名 / 子目录；如需新增可上传文件，要改代码并换镜像。
+- 备份文件与限流状态均为单容器本地 / 内存状态；多副本部署时各自独立。
+- `kubernetes.yaml` / `proxmox.yaml` 不在 `/api/hash` 的监听列表内，改这两个后首页不会自动刷新，手动刷新一次即可（不影响服务端功能）。
+
+---
+
 ## v1.1.0 — 2026-11-10
 
 **定位**：安全与发布硬化。对应《功能升级与架构演进方案》v1.1（WBS 1.1-1 ~ 1.1-6）。首页外观、热榜源、B站选集与播放器**全部不变**，本版只收紧公开读面、补齐鉴权兜底、把发版搬到多架构 CI。改的是 `src/` 下的 React/API 代码：**必须换镜像**；`custom.css` / `custom.js` / `widgets.yaml` / `bookmarks.yaml` **都不用动**。

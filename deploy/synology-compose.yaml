@@ -1,7 +1,7 @@
 # 启动前改 3 类 CHANGE_ME（密码 / secret / 访问地址）与 volumes 左侧路径
 services:
   homepage:
-    image: boyu233/homepage-bookmark-manager:v1.1.0
+    image: boyu233/homepage-bookmark-manager:v1.2.0
     container_name: homepage
     restart: unless-stopped
     ports:
@@ -27,5 +27,8 @@ services:
       # HOMEPAGE_AUDIO_LIMIT: "60"
       # HOMEPAGE_AUDIO_CONCURRENT: "4"
       # HOMEPAGE_RATE_LIMIT_ENABLED: "true"
+      # v1.2.0 起：改配置请在网页「管理书签 → 配置更新」里上传，不用再覆盖文件 / 拉镜像。
+      # HOMEPAGE_CONFIG_UPLOAD_MAX_BYTES: "524288"   # 单文件上限，硬上限 2MB
+      # HOMEPAGE_CONFIG_WRITE_LIMIT: "30"            # 每 IP 每分钟写请求次数
     volumes:
       - /volume1/docker/homepage/config:/app/config

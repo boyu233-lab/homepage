@@ -17,7 +17,13 @@ describe("GHSA 等效防护回归", () => {
   it("GHSA-qxcr-4rv3-v23r：revalidate 走 withAuth，敏感路径在 RESERVED_PATHS", () => {
     expect(source("pages/api/revalidate.js")).toContain("withAuth(handler)");
     const auth = source("utils/auth.js");
-    for (const path of ["/api/config/bookmarks", "/api/services/proxy", "/api/revalidate", "/api/mcp"]) {
+    for (const path of [
+      "/api/config/bookmarks",
+      "/api/config/upload",
+      "/api/services/proxy",
+      "/api/revalidate",
+      "/api/mcp",
+    ]) {
       expect(auth).toContain(`"${path}"`);
     }
   });

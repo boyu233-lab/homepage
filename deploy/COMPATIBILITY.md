@@ -11,7 +11,8 @@
 | v1.0.3 | `:v1.0.3` | 是 | `widgets.yaml` / `custom.js` / `custom.css` | `bookmarks.yaml` | — | tag 回退 |
 | v1.0.4 | `:v1.0.4` | 是 | `custom.css` / `custom.js` | `widgets.yaml` / `bookmarks.yaml` | — | tag 回退 |
 | v1.0.5 | `:v1.0.5` | 是 | `custom.css` | `custom.js` / `widgets.yaml` / `bookmarks.yaml` | — | tag 回退 |
-| **v1.1.0** | `:v1.1.0` | **是** | **无** | **全部配置文件**（含 `custom.css` / `custom.js` / `widgets.yaml` / `bookmarks.yaml`） | 限流、登录锁定、弱 secret 严格模式、MCP 开关（均可选，不设即用默认） | tag 改回 `:v1.0.5` |
+| v1.1.0 | `:v1.1.0` | 是 | 无 | 全部配置文件 | 限流 / 登录锁定 / 弱 secret / MCP（可选） | tag 改回 `:v1.0.5` |
+| **v1.2.0** | `:v1.2.0` | **是（最后一次）** | **无** | **全部配置文件** | 上传体积上限 / 写限流（可选） | tag 改回 `:v1.1.0` |
 
 ## 判断口径
 
@@ -19,6 +20,12 @@
 2. 只改 `src/skeleton/custom.css` / `custom.js` / `widgets.yaml` → 覆盖对应文件 + **Ctrl+F5**，镜像可不动。
 3. 升级包里的 `MANIFEST.sha256` 用于核对包内配置与仓库 `src/skeleton/` 是否一致；不一致时以仓库 tag 为准。
 4. 入口脚本 `docker-entrypoint.sh` 只在配置文件缺失 / 为空 / 与官方默认逐字节一致时自动补齐，不会覆盖用户编辑过的文件。
+
+## v1.2.0 特别说明
+
+本版是**最后一次因为「改配置」而必须换镜像**：新增了上传 API 与管理页页签，属于 `src/` 代码改动。
+装好 `:v1.2.0` 之后，修改 9 个配置文件（YAML / CSS / JS）一律走网页上传，规则 2 的「覆盖文件 + Ctrl+F5」不再是必需步骤
+（当然仍可继续用文件管理器手动覆盖，两者等价）。上传接口会自己备份、校验、清缓存，并让首页自动刷新。
 
 ## v1.1.0 特别说明
 
