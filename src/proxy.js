@@ -10,13 +10,45 @@ import { isAuthEnabled } from "utils/env";
 //   管理接口 / 服务代理 / 所有写操作都要求有效会话。
 const PROTECTED_PAGES = ["/manage"];
 
+// GHSA-qxcr-4rv3-v23r：Next.js 会对携带内部按需重验证头的请求跳过 middleware/proxy，
+// 上游曾因此出现鉴权与 Host 校验绕过。本 fork 的敏感 API 由 withAuth 在 handler 层把关、
+// /manage 由页面层 getServerSideProps 二次校验；这里再拒绝外部伪造的重验证头，形成第三道防线。
+const REVALIDATION_HEADER_PREFIX = "x-prerender-revalidate";
+
 function currentAuthSecret() {
   // 运行时读取，避免生产镜像在构建期把 secret 固化
   return process.env.NEXTAUTH_SECRET || process.env.HOMEPAGE_AUTH_SECRET;
 }
 
+// 兼容 NextRequest 的 Headers、Map 与单元测试里的普通对象三种形态。
+function requestHeaderNames(headers) {
+  if (!headers) return [];
+  if (typeof headers.keys === "function") {
+    try {
+      return [...headers.keys()];
+    } catch {
+      // 某些自定义桩的 keys() 不可迭代，回退到对象键
+    }
+  }
+  return Object.keys(headers);
+}
+
+function readRequestHeader(headers, name) {
+  if (!headers) return null;
+  if (typeof headers.get === "function") return headers.get(name);
+  return headers[name] ?? headers[name.toLowerCase()] ?? null;
+}
+
 export async function proxy(req) {
-  if (!isAllowedHost(req.headers.get("host"))) {
+  if (
+    requestHeaderNames(req.headers).some((name) =>
+      String(name).toLowerCase().startsWith(REVALIDATION_HEADER_PREFIX),
+    )
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!isAllowedHost(readRequestHeader(req.headers, "host"))) {
     return NextResponse.json({ error: "Host validation failed. See logs for more details." }, { status: 400 });
   }
 

@@ -4,10 +4,12 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 import { withAllowedHost } from "utils/auth";
+import { createLoginLimiter, loginClientKey, secretWeakness } from "utils/auth-hardening";
 import { applyNextAuthEnv, isAuthEnabled } from "utils/env";
 import createLogger from "utils/logger";
 
 const MIN_AUTH_SECRET_LENGTH = 32;
+const loginLimiter = createLoginLimiter();
 
 const authEnabled = isAuthEnabled();
 const issuer = process.env.HOMEPAGE_OIDC_ISSUER;
@@ -65,6 +67,17 @@ if (authEnabled) {
       `HOMEPAGE_AUTH_SECRET (or NEXTAUTH_SECRET) must be at least ${MIN_AUTH_SECRET_LENGTH} characters. Generate one with: openssl rand -base64 32`,
     );
   }
+
+  // 长度达标但仍是 CHANGE_ME / 测试值时，默认醒目告警；设 HOMEPAGE_REQUIRE_STRONG_SECRET=true
+  // 则直接拒绝启动，避免「占位符长度刚好够」这种隐性风险被带到公网。
+  const weakness = secretWeakness(process.env.NEXTAUTH_SECRET);
+  if (weakness) {
+    const message = `NEXTAUTH_SECRET 疑似占位符（${weakness}）。请立刻用 openssl rand -base64 32 重新生成。`;
+    if (process.env.HOMEPAGE_REQUIRE_STRONG_SECRET === "true") {
+      throw new Error(message);
+    }
+    createLogger("nextauth").warn(message);
+  }
 }
 
 // Give fail2ban / CrowdSec etc something to match on
@@ -118,18 +131,30 @@ if (authEnabled) {
         credentials: {
           password: { label: "Password", type: "password" },
         },
-        async authorize(credentials) {
+        async authorize(credentials, request) {
+          const clientKey = loginClientKey(request);
           const provided = credentials?.password;
+          // 锁定期内即使密码正确也拒绝，避免攻击者靠持续重试撞开窗口边界。
+          if (loginLimiter.isLocked(clientKey)) {
+            createLogger("nextauth").warn(
+              "Password sign-in temporarily locked for client (retry after %ss)",
+              loginLimiter.retryAfterSeconds(clientKey),
+            );
+            return null;
+          }
           if (!homepageAuthPasswordDigest || typeof provided !== "string") {
+            loginLimiter.recordFailure(clientKey);
             logFailedPasswordSignIn();
             return null;
           }
           const providedDigest = createHash("sha256").update(provided, "utf8").digest();
           const isMatch = timingSafeEqual(providedDigest, homepageAuthPasswordDigest);
           if (!isMatch) {
+            loginLimiter.recordFailure(clientKey);
             logFailedPasswordSignIn();
             return null;
           }
+          loginLimiter.recordSuccess(clientKey);
           return {
             id: "homepage",
             name: "Homepage",

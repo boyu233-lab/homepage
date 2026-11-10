@@ -2,6 +2,7 @@ import { withAuth } from "utils/auth";
 import { BVID_PATTERN, loadView, pageLink } from "utils/bilibili-view";
 import { getPrivateWidgetOptions } from "utils/config/widget-helpers";
 import createLogger from "utils/logger";
+import { withPublicWidgetGuard } from "utils/rate-limit";
 
 const logger = createLogger("bilibili_pages");
 
@@ -53,4 +54,4 @@ async function handler(req, res) {
   });
 }
 
-export default withAuth(handler);
+export default withAuth(withPublicWidgetGuard(handler, "pages"));

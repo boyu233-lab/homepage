@@ -6,6 +6,8 @@ import { useCallback, useState } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
 import ResolvedIcon from "components/resolvedicon";
 
+import { withPageAuth } from "utils/auth";
+
 const FIELDS = [
   { key: "name", label: "名称", required: true, w: "w-36" },
   { key: "href", label: "链接", required: true, w: "w-64", placeholder: "https://..." },
@@ -327,3 +329,8 @@ export default function Manage() {
     </>
   );
 }
+
+// GHSA-qxcr-4rv3-v23r 纵深防御：Next.js 会为带 x-prerender-revalidate 的内部重验证请求
+// 跳过 middleware/proxy，所以 /manage 不能只靠 proxy.js 单点守门。页面层再校验一次会话，
+// 即使 proxy 被绕过，未登录请求仍会跳转到登录页；敏感 API 则由 withAuth 在 handler 层把关。
+export const getServerSideProps = withPageAuth(async () => ({ props: {} }));

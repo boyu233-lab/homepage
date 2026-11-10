@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { withAuth } from "utils/auth";
 import { BVID_PATTERN, cidInView, jsonHeaders, loadView, REFERER, USER_AGENT } from "utils/bilibili-view";
 import createLogger from "utils/logger";
+import { withPublicWidgetGuard } from "utils/rate-limit";
 
 const logger = createLogger("bilibili_audio");
 
@@ -182,4 +183,4 @@ async function handler(req, res) {
   return undefined;
 }
 
-export default withAuth(handler);
+export default withAuth(withPublicWidgetGuard(handler, "audio"));

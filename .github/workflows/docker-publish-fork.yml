@@ -19,6 +19,11 @@ on:
         description: "附加镜像标签（默认 latest）"
         required: false
         default: "latest"
+      offline_tar:
+        description: "额外导出 amd64 离线 tar 并上传为 Actions artifact"
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -27,8 +32,69 @@ permissions:
   contents: read
 
 jobs:
-  build-and-push:
+  # A5：tag / 手动发布前必须全量 ESLint + Vitest 绿灯，构建 job 依赖两者。
+  # 本地日常迭代仍可只跑定向测试；这里只在发版时跑全量。
+  # Vitest 分 4 片，与上游 test.yml 一致，避免单进程 fork worker 启动超时。
+  lint-gate:
+    name: Full ESLint gate
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint (full)
+        run: pnpm run lint
+
+  test-gate:
+    name: Full Vitest gate (${{ matrix.shard }}/4)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Vitest (shard)
+        run: pnpm -s exec vitest run --shard ${{ matrix.shard }}/4 --pool forks
+
+  build-and-push:
+    needs: [lint-gate, test-gate]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     env:
       DH_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/homepage-bookmark-manager
     steps:
@@ -46,6 +112,12 @@ jobs:
           fi
           echo "Docker Hub 凭据已配置"
 
+      - name: Resolve short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU (arm64)
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -57,13 +129,14 @@ jobs:
 
       # 不传 CI=true：让 Dockerfile 的 builder 阶段自行 pnpm install + pnpm build，
       # 与本地 `pnpm build` 的验证路径一致，也不依赖 runner 上的 pnpm 版本。
-      - name: Build and push
+      - name: Build and push (amd64 + arm64)
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           build-args: |
             BUILDTIME=${{ github.event.repository.updated_at }}
             VERSION=${{ github.ref_name }}
@@ -71,6 +144,55 @@ jobs:
           tags: |
             ${{ env.DH_IMAGE }}:latest
             ${{ env.DH_IMAGE }}:${{ inputs.tag || github.ref_name }}
-            ${{ env.DH_IMAGE }}:sha-${{ github.sha }}
+            ${{ env.DH_IMAGE }}:sha-${{ env.SHORT_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # A4：Registry 侧核验多架构 manifest 与三标签 digest 一致，避免「推成功但其实只有一个架构」。
+      - name: Verify multi-arch manifest and tags
+        run: |
+          set -euo pipefail
+          IMAGE="${DH_IMAGE}:${{ inputs.tag || github.ref_name }}"
+          echo "== manifest for ${IMAGE} =="
+          docker buildx imagetools inspect "$IMAGE"
+          docker buildx imagetools inspect --raw "$IMAGE" > /tmp/manifest.json
+          python3 - <<'PY'
+          import json, sys
+          data = json.load(open('/tmp/manifest.json'))
+          platforms = {
+              f"{m.get('platform', {}).get('os')}/{m.get('platform', {}).get('architecture')}"
+              for m in data.get('manifests', [])
+          }
+          print('platforms =', sorted(platforms))
+          for expected in ('linux/amd64', 'linux/arm64'):
+              if expected not in platforms:
+                  sys.exit(f'missing {expected} in manifest list')
+          PY
+          echo "build digest = ${{ steps.build.outputs.digest }}"
+          declare -A DIGESTS
+          for TAG in latest "${{ inputs.tag || github.ref_name }}" "sha-${SHORT_SHA}"; do
+            DIGESTS[$TAG]=$(docker buildx imagetools inspect --raw "${DH_IMAGE}:${TAG}" | sha256sum | cut -d' ' -f1)
+            printf '%-16s manifest-sha256=%s\n' "$TAG" "${DIGESTS[$TAG]}"
+          done
+          for TAG in "${{ inputs.tag || github.ref_name }}" "sha-${SHORT_SHA}"; do
+            [ "${DIGESTS[$TAG]}" = "${DIGESTS[latest]}" ] || { echo "::error::tag ${TAG} digest mismatch"; exit 1; }
+          done
+          echo "Multi-arch manifest and three tags verified."
+
+      # 可选：导出 amd64 离线镜像供群晖「从文件导入」，避免国内拉取 Docker Hub 断流。
+      - name: Export amd64 offline tar
+        if: ${{ inputs.offline_tar }}
+        run: |
+          set -euo pipefail
+          IMAGE="${DH_IMAGE}:${{ inputs.tag || github.ref_name }}"
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker save -o "homepage-image-${{ inputs.tag || github.ref_name }}.tar" "$IMAGE"
+          sha256sum "homepage-image-${{ inputs.tag || github.ref_name }}.tar"
+
+      - name: Upload offline tar artifact
+        if: ${{ inputs.offline_tar }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-offline-tar
+          path: homepage-image-*.tar
+          retention-days: 30

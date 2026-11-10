@@ -1,6 +1,7 @@
 import { withAuth } from "utils/auth";
 import { getPrivateWidgetOptions } from "utils/config/widget-helpers";
 import createLogger from "utils/logger";
+import { withPublicWidgetGuard } from "utils/rate-limit";
 
 const logger = createLogger("bilibili_music");
 
@@ -195,4 +196,4 @@ async function handler(req, res) {
   return res.status(200).json(payload);
 }
 
-export default withAuth(handler);
+export default withAuth(withPublicWidgetGuard(handler, "search"));

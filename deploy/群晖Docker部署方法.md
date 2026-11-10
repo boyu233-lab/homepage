@@ -578,6 +578,114 @@ curl -i http://127.0.0.1:3030/manage | head -5
 
 ---
 
+## 6.10 v1.1.0：安全与发布硬化（2026-11-10，当前）
+
+### 这一版改了什么
+
+首页外观、热榜 9 源、B站选集 131 首、播放器与音量锁定**全部不变**。本版只做三件事：收紧公开读接口、补鉴权兜底、把发版搬到多架构 CI。
+
+| 项 | 说明 |
+|---|---|
+| 追平上游 | fork 与上游 `main` 只差 3 个 commit / 2 个文件（`package.json` 版本号、Unraid 文档权限），已等价应用 |
+| 5 个 GHSA | 逐条核验等效防护，并新增回归测试固化；针对 `GHSA-qxcr-4rv3-v23r`（按需重验证头绕过鉴权）额外加了三道防线 |
+| 限流 | 4 个匿名 widget 接口按 IP 限流；音频代理另有并发上限与跨站盗链校验；默认阈值留足余量，不误伤首页 |
+| 登录 | 弱 / 占位符 `NEXTAUTH_SECRET` 告警（可设严格模式拒绝启动）；密码连续失败 5 次锁定 5 分钟 |
+| CI | GitHub Actions 产出 `amd64 + arm64` 双架构镜像，发版前强制全量 ESLint + Vitest 绿灯，Registry 侧校验 manifest 与三标签 |
+| MCP | 代码早已实现 7 个工具，本版只补启用说明（默认仍关闭） |
+
+### 升级步骤（**只换镜像**）
+
+1. **必须换镜像**：`boyu233/homepage-bookmark-manager:v1.1.0`（或导入 `homepage-image-v1.1.0.tar`）。限流、鉴权兜底都在镜像代码里，只改配置文件无效。
+2. **不用动任何配置文件**：`custom.css`、`custom.js`、`widgets.yaml`、`settings.yaml`、`services.yaml`、**`bookmarks.yaml`** 全部保持原样。compose 里新增的环境变量都是**可选**的，不配即用默认。
+3. 重启项目 → **Ctrl+F5** 强刷。
+4. **回滚**：把镜像 tag 改回 `:v1.0.5` 即可，配置层完全兼容，无需还原任何文件。
+
+### 反向代理必须做的一件事
+
+`GHSA-qxcr-4rv3-v23r` 的官方缓解措施是**在反代剥离 `x-prerender-revalidate` 请求头**。本 fork 已在应用层加了三层防护（API 层 `withAuth`、页面层 `withPageAuth`、proxy 拒绝伪造头），但公网部署仍建议照做：
+
+```nginx
+# Nginx / 群晖反向代理
+proxy_set_header x-prerender-revalidate "";
+```
+
+同时让反代**覆盖** `X-Forwarded-For`（不要追加客户端自带值），否则限流可被伪造头绕过：
+
+```nginx
+proxy_set_header X-Forwarded-For $remote_addr;
+```
+
+### 可选：启用 MCP（让 AI 助手读改配置）
+
+在 compose 的 `environment` 里加（**仅限内网**，token 能读到全部服务凭据）：
+
+```yaml
+      HOMEPAGE_MCP_ENABLED: "true"
+      HOMEPAGE_MCP_TOKEN: "用 openssl rand -base64 32 生成，至少 32 位"
+      # HOMEPAGE_MCP_ALLOW_WRITE: "true"   # 需要让 AI 改 YAML 时才开，默认关闭
+```
+
+自检（把地址和 token 换成自己的）：
+
+```bash
+# 不带 token 必须 401
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://<NAS>:3000/api/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# 带 token 返回 7 个工具
+curl -s -X POST http://<NAS>:3000/api/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <TOKEN>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python -m json.tool
+```
+
+7 个工具：`list_config_files` / `read_config_file` / `validate_config_file` / `write_config_file` / `add_service` / `add_info_widget` / `homepage_docs`。写类工具默认返回「Writing is disabled」，必须显式设 `HOMEPAGE_MCP_ALLOW_WRITE=true`。
+
+### 可选：限流与登录参数
+
+被误伤时先调大阈值，不必关掉整个防护；应急才设 `HOMEPAGE_RATE_LIMIT_ENABLED: "false"`。
+
+| 变量 | 默认 | 何时调整 |
+|---|---|---|
+| `HOMEPAGE_PUBLIC_WIDGET_LIMIT` | `180`/分钟/IP | 首页刷新报 429 时调大 |
+| `HOMEPAGE_AUDIO_LIMIT` | `60`/分钟/IP | 频繁拖进度条触发 429 时调大 |
+| `HOMEPAGE_AUDIO_CONCURRENT` | `4` | 多标签页同时播放触发 503 时调大 |
+| `HOMEPAGE_TRUST_PROXY` | `true` | 反代没有覆盖 `X-Forwarded-For` 时设 `false`（改用 socket 地址） |
+| `HOMEPAGE_PUBLIC_ORIGINS` | 空 | 音频需从额外域名访问时填完整 URL，逗号分隔 |
+| `HOMEPAGE_REQUIRE_STRONG_SECRET` | `false` | 设 `true` 后占位符 secret 会直接拒绝启动 |
+| `HOMEPAGE_LOGIN_MAX_FAILURES` | `5` | 登录失败锁定阈值 |
+
+### 自检
+
+```bash
+# 首页与三个核心链路
+curl -s -o /dev/null -w "home=%{http_code}\n" http://<NAS>:3000/
+curl -s "http://<NAS>:3000/api/widgets/news?index=3&source=weibo" | python -c "import sys,json;d=json.load(sys.stdin);print('news',len(d['items']),'sources',len(d['availableSources']))"
+curl -s "http://<NAS>:3000/api/widgets/bilibili_pages?index=4&bvid=BV1sX8A6bEPr" | python -c "import sys,json;d=json.load(sys.stdin);print('pages',d['total'])"
+
+# 限流生效：连续快速请求音频，后面应出现 429（正常播放不受影响）
+for i in $(seq 1 70); do curl -s -o /dev/null -w "%{http_code} " "http://<NAS>:3000/api/widgets/bilibili_audio?bvid=BV1sX8A6bEPr"; done; echo
+
+# 安全响应头
+curl -sI "http://<NAS>:3000/api/widgets/news?index=3" | grep -i "x-ratelimit\|x-content-type\|referrer-policy"
+
+# 未登录访问 /manage 应跳登录页（验证重验证头绕过已封堵）
+curl -s -o /dev/null -w "%{http_code}\n" -H "x-prerender-revalidate: anything" http://<NAS>:3000/manage
+```
+
+### 排错
+
+| 现象 | 原因 / 处理 |
+|---|---|
+| 首页热搜空白、部件全 429 | 反代没覆盖 `X-Forwarded-For`，所有访客被算成同一个 IP；先调大 `HOMEPAGE_PUBLIC_WIDGET_LIMIT`，再修反代头 |
+| 切歌时偶尔 503 | 音频并发到上限，调大 `HOMEPAGE_AUDIO_CONCURRENT` |
+| 启动日志出现「NEXTAUTH_SECRET 疑似占位符」 | 用 `openssl rand -base64 32` 重新生成并重启；别把占位符带到公网 |
+| 忘记密码被锁 5 分钟 | 等 5 分钟，或重启容器清空内存计数（不影响书签） |
+| 从别的域名嵌入播放报 403 | 把该域名填进 `HOMEPAGE_PUBLIC_ORIGINS` |
+
+---
+
 ## 7. 启动后验收（逐条实测）
 
 | # | 场景 | 期望结果 |
@@ -716,5 +824,9 @@ docker.1ms.run/boyu233/homepage-bookmark-manager:latest
 - [ ] 若以后在 `services.yaml` 里加 NAS / Docker / K8s 组件，先评估服务代理接口的暴露面
 - [ ] `custom.js` 顶部的 `WALLPAPER_TODAY` / `WALLPAPER_RANDOM` 默认为第三方图源，会暴露访客 IP；可换自托管地址，或两组都设为空数组彻底关闭在线请求
 - [ ] 只对内网开放，或经反向代理 + HTTPS 暴露；不要直接把 3000 端口映射到公网
+- [ ] **（v1.1.0 新增）反向代理剥离 `x-prerender-revalidate` 请求头**（`proxy_set_header x-prerender-revalidate "";`），对应 `GHSA-qxcr-4rv3-v23r`
+- [ ] **（v1.1.0 新增）反向代理覆盖 `X-Forwarded-For`**（`proxy_set_header X-Forwarded-For $remote_addr;`），否则公开读限流可被伪造头绕过
+- [ ] **（v1.1.0 新增）`NEXTAUTH_SECRET` 不是 `CHANGE_ME` / 测试值 / 重复字符**；生产建议设 `HOMEPAGE_REQUIRE_STRONG_SECRET=true`
+- [ ] **（v1.1.0 新增）若启用 MCP**：token ≥32 位、只限内网访问、`HOMEPAGE_MCP_ALLOW_WRITE` 默认保持 `false`；token 能读到 `services.yaml` 里的凭据
 
 更完整的验收矩阵与安全说明见 [`群晖部署清单.md`](./群晖部署清单.md)。

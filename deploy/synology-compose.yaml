@@ -1,7 +1,7 @@
 # 启动前改 3 类 CHANGE_ME（密码 / secret / 访问地址）与 volumes 左侧路径
 services:
   homepage:
-    image: boyu233/homepage-bookmark-manager:v1.0.5
+    image: boyu233/homepage-bookmark-manager:v1.1.0
     container_name: homepage
     restart: unless-stopped
     ports:
@@ -15,5 +15,17 @@ services:
       HOMEPAGE_CONFIG_DIR: "/app/config"
       TZ: "Asia/Shanghai"
       PORT: "3000"
+      # v1.1.0 起：CHANGE_ME / 测试值 / 纯数字 等弱 secret 会告警；
+      # 用 openssl rand -base64 32 生成，或设 HOMEPAGE_REQUIRE_STRONG_SECRET: "true" 强制拒绝占位符。
+      #
+      # 以下均为可选（不设即用默认）。MCP token 可读全部服务凭据，仅限内网使用，写权限默认关闭。
+      # HOMEPAGE_MCP_ENABLED: "true"
+      # HOMEPAGE_MCP_TOKEN: "CHANGE_ME_MCP_TOKEN_AT_LEAST_32_CHARS"
+      # HOMEPAGE_MCP_ALLOW_WRITE: "false"
+      # HOMEPAGE_REQUIRE_STRONG_SECRET: "true"
+      # HOMEPAGE_PUBLIC_WIDGET_LIMIT: "180"
+      # HOMEPAGE_AUDIO_LIMIT: "60"
+      # HOMEPAGE_AUDIO_CONCURRENT: "4"
+      # HOMEPAGE_RATE_LIMIT_ENABLED: "true"
     volumes:
       - /volume1/docker/homepage/config:/app/config

@@ -1,7 +1,50 @@
 # 变更日志（Homepage 书签管理版 / boyu233-lab/homepage fork）
 
 版本号规则：`主版本.次版本.修订号`。本文件随 git tag 一起发布，`VERSION` 文件保存当前版本号。
-上游 `package.json` 的 `2.6.0` 是 Homepage 上游版本，**不是本 fork 的发布版本**，不要混用。
+上游 `package.json` 的 `2.7.0` 是 Homepage 上游版本，**不是本 fork 的发布版本**，不要混用。
+
+---
+
+## v1.1.0 — 2026-11-10
+
+**定位**：安全与发布硬化。对应《功能升级与架构演进方案》v1.1（WBS 1.1-1 ~ 1.1-6）。首页外观、热榜源、B站选集与播放器**全部不变**，本版只收紧公开读面、补齐鉴权兜底、把发版搬到多架构 CI。改的是 `src/` 下的 React/API 代码：**必须换镜像**；`custom.css` / `custom.js` / `widgets.yaml` / `bookmarks.yaml` **都不用动**。
+
+### 变更
+
+| WBS | 模块 | 内容 |
+|---|---|---|
+| 1.1-1 | 追平上游 | GitHub compare 确认 fork 仅落后 3 commits、改动只有 2 个文件：`package.json` `2.6.0 → 2.7.0`、`docs/widgets/services/unraid.md` Unraid API key 权限 `ADMIN → VIEWER`。已等价应用，无需合并上游 |
+| 1.1-1 | 5 个 GHSA 核验 | `GHSA-qxcr-4rv3-v23r`(high) 的按需重验证头绕过：本 fork 敏感 API 由 `withAuth` 在 handler 层把关，仍补三道防线 —— `proxy.js` 拒绝外部伪造 `x-prerender-revalidate*`、`/manage` 增加 `getServerSideProps` + `withPageAuth` 页面层兜底、部署文档要求反代剥离该头。另 4 条（`669x` / `rg3r` / `c4qv` / `24m5`）逐条核对：`services/proxy` 无 endpoint 时已强制 GET + 清 body、glances version 已过 `parseVersionForUrl`、`resources` disk 只按挂载点匹配不做文件探测、基线远高于 0.9.1。新增回归测试固化这些结论 |
+| 1.1-2 | 公开读限流 | 新增 `src/utils/rate-limit.js`：`news` / `bilibili_music` / `bilibili_pages` / `bilibili_audio` 四个匿名端点接入按 IP 的固定窗口限流 + 安全响应头；音频额外加并发上限与跨站盗链校验。默认 180 次/分钟（普通 widget）、60 次/分钟 + 并发 4（音频），阈值全部可用环境变量调，`HOMEPAGE_RATE_LIMIT_ENABLED=false` 可一键关闭。**阈值刻意留余量，不误伤首页并发拉取与拖动进度条** |
+| 1.1-3 | 凭据与登录 | 新增 `src/utils/auth-hardening.js`：`NEXTAUTH_SECRET` 占位符/重复字符/纯数字检测（默认醒目告警，`HOMEPAGE_REQUIRE_STRONG_SECRET=true` 时拒绝启动）；密码登录失败按客户端计数，5 次/分钟触发 5 分钟临时锁定，成功后清零 |
+| 1.1-4 | 多架构 CI | `.github/workflows/docker-publish-fork.yml` 加 QEMU + buildx，产出 `linux/amd64` + `linux/arm64`；三标签改为 `latest` / `vX.Y.Z` / `sha-<7位>`；新增 Registry 侧 manifest 双架构校验与三标签一致性断言；可选导出 amd64 离线 tar 为 Actions artifact |
+| 1.1-5 | 全量测试门禁 | 同一 workflow 新增 `quality-gate` job：发版前跑全量 `pnpm run lint` + `vitest run`，`build-and-push` 依赖其绿灯。本地日常迭代仍可只跑定向测试 |
+| 1.1-6 | MCP | 代码本已完整实现 7 个工具，本版只补部署文档与 compose 注释：设 `HOMEPAGE_MCP_ENABLED=true` + 32 位以上 `HOMEPAGE_MCP_TOKEN` 即可让 AI 助手读取/校验 YAML；写权限默认关闭 |
+
+### 新增环境变量（全部可选，不设即用默认）
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `HOMEPAGE_RATE_LIMIT_ENABLED` | `true` | 设 `false` 关闭公开读限流（应急） |
+| `HOMEPAGE_PUBLIC_WIDGET_LIMIT` / `HOMEPAGE_PUBLIC_WIDGET_WINDOW_MS` | `180` / `60000` | 普通 widget 每 IP 窗口次数 / 窗口毫秒 |
+| `HOMEPAGE_AUDIO_LIMIT` / `HOMEPAGE_AUDIO_WINDOW_MS` / `HOMEPAGE_AUDIO_CONCURRENT` | `60` / `60000` / `4` | 音频代理限流与并发 |
+| `HOMEPAGE_TRUST_PROXY` | `true` | 是否信任 `x-forwarded-for` 取客户端 IP；反代必须覆盖该头 |
+| `HOMEPAGE_PUBLIC_ORIGINS` | 空 | 额外允许访问音频代理的源（逗号分隔完整 URL） |
+| `HOMEPAGE_LOGIN_MAX_FAILURES` / `HOMEPAGE_LOGIN_WINDOW_MS` / `HOMEPAGE_LOGIN_LOCK_MS` | `5` / `60000` / `300000` | 登录失败锁定策略 |
+| `HOMEPAGE_REQUIRE_STRONG_SECRET` | `false` | 设 `true` 时弱/占位符 secret 直接拒绝启动 |
+| `HOMEPAGE_MCP_ENABLED` / `HOMEPAGE_MCP_TOKEN` / `HOMEPAGE_MCP_ALLOW_WRITE` | `false` / 空 / `false` | MCP 端点开关、Bearer token、写权限 |
+
+### 测试与验收
+
+- 新增 `src/utils/rate-limit.test.js`、`src/utils/auth-hardening.test.js`、`src/__tests__/security/v1.1-hardening.test.js`，连同原有选集/播放器定向测试一起通过；改动文件 ESLint 0 错误。
+- 容器冒烟：首页 200、9 源热榜、B站搜索/选集/分P音频 206 全通；高频匿名请求音频端点返回 429，首页部件不受影响；`tools/list` 未带 token 返回 401。
+- 回滚：直接把镜像 tag 换回 `:v1.0.5` 即可，配置层完全兼容。
+
+### 已知限制
+
+- 限流与登录锁定都是**单进程内存状态**：容器重启即清空；多副本部署需靠反代统一限流。
+- arm64 镜像由 GitHub Actions 云端构建，本机仅验证 amd64；群晖 x86 机型用 `linux/amd64` 无影响。
+- 音频代理仍经 NAS 转发，带宽占用不变；免登录最高约 184kbps；B站偶发风控点右上角刷新即可。
 
 ---
 
