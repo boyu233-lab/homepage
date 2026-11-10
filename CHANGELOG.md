@@ -36,9 +36,16 @@
 
 ### 测试与验收
 
-- 新增 `src/utils/rate-limit.test.js`、`src/utils/auth-hardening.test.js`、`src/__tests__/security/v1.1-hardening.test.js`，连同原有选集/播放器定向测试一起通过；改动文件 ESLint 0 错误。
-- 容器冒烟：首页 200、9 源热榜、B站搜索/选集/分P音频 206 全通；高频匿名请求音频端点返回 429，首页部件不受影响；`tools/list` 未带 token 返回 401。
+- **全量测试门禁**：ESLint 全量 0 错误；Vitest 分 4 片共 **584 个测试文件 / 2075 用例全部通过**（新增 `rate-limit.test.js` / `auth-hardening.test.js` / `v1.1-hardening.test.js`）。
+- **容器内真实冒烟**（`:v1.1.0`，挂载配置目录）：首页 200；微博 50 条 / 9 源；`X-RateLimit-Limit: 180` 等安全响应头；选集 131 首（P1 晚星 / P2 夏恋）；搜索 19 条；第 2P 音频 `206 + audio/mp4 + Content-Range` + fMP4 `ftyp`；跨站音频 403；MCP `tools/list` 无 token 401；`/manage` 未登录 307、带伪造 `x-prerender-revalidate` 头 403；限流压测 195 次请求得到 `180×200 + 15×429`，阈值精确生效。
+- **R1 spike**（架构验证原型，未改生产代码）：`news.js` 逐字抽出 391 行核心逻辑，裸 Node 服务冷启动 735ms、常驻 61.2MB；9 个源的 HTTP 状态 / 顶层字段 / 递归类型签名 / `availableSources` / `items` 字段契约 **9/9 一致**，标题集合重合度 1.000。详见 `docs/R1-spike-报告.md` 与 `docs/R1-spike-对拍结果.json`。
 - 回滚：直接把镜像 tag 换回 `:v1.0.5` 即可，配置层完全兼容。
+
+### 发布坐标
+
+- 镜像 `:v1.1.0` = `:latest` = `:sha-ffd1785`，digest `sha256:6fa01d546c22d1a5f3f3a728b4c04236ea253c00c79911f06e64cdb6e6f98b59`（Registry API 三标签核验一致）。
+- 代码 commit `ffd1785`，git tag `v1.1.0` 指向该提交；`dev` / `feat/bookmark-manager` 已同步推送。坐标回填与交付物清单见升级包内 `升级说明.txt`。
+- 离线镜像 `homepage-image-v1.1.0.tar`（81MB，sha256 `ea8faf4a7ec5971fbef6648ebf904943c938fef6adb84ac7aae3b744b151185a`）。
 
 ### 已知限制
 
