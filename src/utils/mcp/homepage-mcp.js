@@ -7,11 +7,26 @@ import * as yaml from "js-yaml";
 import { CONF_DIR } from "utils/config/config";
 import { loadYaml } from "utils/config/yaml";
 
+// Legacy (2025-11-25) handshake version. Kept verbatim so legacy responses stay byte-identical.
 const PROTOCOL_VERSION = "2025-11-25";
+// dual-era declaration: both eras must be advertised, otherwise legacy clients cannot recognize us.
+const SUPPORTED_VERSIONS = ["2026-07-28", "2025-11-25"];
+const META_NAMESPACE = "io.modelcontextprotocol/";
 const SERVER_INFO = {
   name: "homepage",
   version: "1.0.0",
 };
+const CAPABILITIES = {
+  tools: {},
+  resources: {},
+};
+const INSTRUCTIONS =
+  "Homepage MCP helps inspect and validate Homepage YAML configuration. File writes are disabled unless HOMEPAGE_MCP_ALLOW_WRITE=true.";
+const RESULT_TTL_MS = 60_000;
+const CACHE_SCOPE = "private";
+// Non-enumerable marker so index.js can map modern validation failures to HTTP 400
+// without changing the JSON-RPC wire body or legacy responses.
+const HTTP_STATUS = Symbol("mcpHttpStatus");
 
 const MIN_TOKEN_LENGTH = 32;
 
@@ -476,15 +491,59 @@ export function mcpTokenAuthorized(req) {
   return tokenMatches(bearerToken, expectedDigest) || tokenMatches(req.headers["x-homepage-mcp-token"], expectedDigest);
 }
 
-export function handleMcpRequest(message) {
-  if (!message || message.jsonrpc !== "2.0" || typeof message.method !== "string") {
-    return jsonRpcError(message?.id, -32600, "Invalid JSON-RPC request");
+function getHeader(headers, name) {
+  if (!headers || typeof headers !== "object") return undefined;
+  const target = name.toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === target) return value;
   }
+  return undefined;
+}
 
-  if (message.method.startsWith("notifications/")) {
-    return null;
-  }
+/** HTTP status carried by a modern validation error; JSON-RPC body stays untouched. */
+export function mcpHttpStatus(response) {
+  return response?.[HTTP_STATUS] ?? 200;
+}
 
+function withHttpStatus(response, status) {
+  Object.defineProperty(response, HTTP_STATUS, { value: status, enumerable: false });
+  return response;
+}
+
+function modernError(id, code, message, data) {
+  return withHttpStatus(jsonRpcError(id, code, message, data), 400);
+}
+
+/** per-request era detection: _meta protocolVersion OR MCP-Protocol-Version header => modern. */
+function isModernRequest(message, headers) {
+  const meta = message?.params?._meta;
+  if (meta && Object.prototype.hasOwnProperty.call(meta, `${META_NAMESPACE}protocolVersion`)) return true;
+  return getHeader(headers, "MCP-Protocol-Version") !== undefined;
+}
+
+function modernBase() {
+  return {
+    resultType: "complete",
+    _meta: { [`${META_NAMESPACE}serverInfo`]: SERVER_INFO },
+  };
+}
+
+function modernCacheMeta() {
+  return { ttlMs: RESULT_TTL_MS, cacheScope: CACHE_SCOPE };
+}
+
+function discoverResult() {
+  return {
+    ...modernBase(),
+    supportedVersions: SUPPORTED_VERSIONS,
+    capabilities: CAPABILITIES,
+    instructions: INSTRUCTIONS,
+    ...modernCacheMeta(),
+  };
+}
+
+function handleLegacyRequest(message) {
+  // Verbatim v1.2.0 dispatch — do not alter, legacy clients assert byte-identical output.
   try {
     switch (message.method) {
       case "initialize":
@@ -522,4 +581,122 @@ export function handleMcpRequest(message) {
   } catch (error) {
     return jsonRpcError(message.id, -32602, error.message);
   }
+}
+
+function handleModernRequest(message, headers) {
+  const { method } = message;
+  const params = message.params ?? {};
+
+  const mcpMethod = getHeader(headers, "Mcp-Method");
+  if (mcpMethod === undefined) {
+    return modernError(message.id, -32020, "HeaderMismatch: missing Mcp-Method", {
+      header: "Mcp-Method",
+      required: true,
+    });
+  }
+  if (mcpMethod !== method) {
+    return modernError(message.id, -32020, "HeaderMismatch: Mcp-Method does not match body method", {
+      header: "Mcp-Method",
+      expected: method,
+      received: mcpMethod,
+    });
+  }
+
+  // Named operations must identify their target in Mcp-Name; list/initialize are not named.
+  const namedOperation = method === "tools/call" || method === "resources/read";
+  const mcpName = getHeader(headers, "Mcp-Name");
+  if (namedOperation && mcpName === undefined) {
+    return modernError(message.id, -32020, "HeaderMismatch: missing Mcp-Name", {
+      header: "Mcp-Name",
+      required: true,
+    });
+  }
+  if (mcpName !== undefined) {
+    const named = params.name ?? params.uri;
+    if (named !== undefined && mcpName !== named) {
+      return modernError(message.id, -32020, "HeaderMismatch: Mcp-Name does not match params.name/uri", {
+        header: "Mcp-Name",
+        expected: named,
+        received: mcpName,
+      });
+    }
+  }
+
+  const meta = params._meta;
+  const version = meta?.[`${META_NAMESPACE}protocolVersion`];
+  const clientCapabilities = meta?.[`${META_NAMESPACE}clientCapabilities`];
+  if (!version || clientCapabilities === undefined) {
+    return modernError(message.id, -32602, "Invalid params: modern requests require _meta protocolVersion and clientCapabilities", {
+      required: [`${META_NAMESPACE}protocolVersion`, `${META_NAMESPACE}clientCapabilities`],
+    });
+  }
+  if (!SUPPORTED_VERSIONS.includes(version)) {
+    return modernError(message.id, -32022, "UnsupportedProtocolVersion", {
+      supported: SUPPORTED_VERSIONS,
+      requested: version,
+    });
+  }
+
+  try {
+    switch (method) {
+      case "initialize":
+        return jsonRpcResult(message.id, { capabilities: CAPABILITIES, instructions: INSTRUCTIONS, ...modernBase() });
+      case "tools/list":
+        return jsonRpcResult(message.id, {
+          tools: toolDefinitions(),
+          ...modernBase(),
+          ...modernCacheMeta(),
+        });
+      case "tools/call":
+        return jsonRpcResult(message.id, {
+          ...callTool(params.name, params.arguments ?? {}),
+          ...modernBase(),
+        });
+      case "resources/list":
+        return jsonRpcResult(message.id, {
+          resources: CONFIG_FILES.map(configResource),
+          ...modernBase(),
+          ...modernCacheMeta(),
+        });
+      case "resources/read": {
+        const file = parseConfigResourceUri(params.uri);
+        return jsonRpcResult(message.id, {
+          contents: [
+            {
+              uri: params.uri,
+              mimeType: file.endsWith(".yaml") ? "application/yaml" : "text/plain",
+              text: readConfig(file),
+            },
+          ],
+          ...modernBase(),
+          ...modernCacheMeta(),
+        });
+      }
+      default:
+        return jsonRpcError(message.id, -32601, `Method not found: ${method}`);
+    }
+  } catch (error) {
+    return jsonRpcError(message.id, -32602, error.message);
+  }
+}
+
+export function handleMcpRequest(message, headers = {}) {
+  if (!message || message.jsonrpc !== "2.0" || typeof message.method !== "string") {
+    return jsonRpcError(message?.id, -32600, "Invalid JSON-RPC request");
+  }
+
+  if (message.method.startsWith("notifications/")) {
+    return null;
+  }
+
+  // server/discover MUST be reachable for probing without _meta or headers,
+  // independent of the era detection below.
+  if (message.method === "server/discover") {
+    return jsonRpcResult(message.id, discoverResult());
+  }
+
+  if (isModernRequest(message, headers)) {
+    return handleModernRequest(message, headers);
+  }
+  return handleLegacyRequest(message);
 }

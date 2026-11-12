@@ -2,6 +2,7 @@ import si from "systeminformation";
 
 import { withAuth } from "utils/auth";
 import createLogger from "utils/logger";
+import { classifyWidgetError, withWidgetEnvelope } from "utils/widget/envelope";
 
 const logger = createLogger("resources");
 
@@ -116,4 +117,4 @@ async function handler(req, res) {
   });
 }
 
-export default withAuth(handler);
+export default withAuth(withWidgetEnvelope(handler, { source: "resources", ttlMs: 15_000, classify: classifyWidgetError }));

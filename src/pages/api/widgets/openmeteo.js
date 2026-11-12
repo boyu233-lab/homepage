@@ -1,5 +1,6 @@
 import { withAuth } from "utils/auth";
 import { cachedRequest } from "utils/proxy/http";
+import { classifyWidgetError, withWidgetEnvelope } from "utils/widget/envelope";
 
 async function handler(req, res) {
   const { latitude, longitude, units, cache, timezone } = req.query;
@@ -9,4 +10,4 @@ async function handler(req, res) {
   return res.send(await cachedRequest(apiUrl, cache));
 }
 
-export default withAuth(handler);
+export default withAuth(withWidgetEnvelope(handler, { source: "openmeteo", ttlMs: 600_000, classify: classifyWidgetError }));

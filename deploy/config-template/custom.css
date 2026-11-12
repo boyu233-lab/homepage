@@ -436,7 +436,7 @@ input[placeholder*="搜索"]:focus {
    DOM 节点保持 React 原样,只改排布:搜索 → 时间 → 多源热搜 → B站搜索播放
    依次向下单列堆叠(热搜在上、音乐在下),每块都占满整行宽度。
 
-   ⚠ 关键:上游 index.jsx 的 rightAlignedWidgets 只含 search/datetime/news,
+   注意 关键:上游 index.jsx 的 rightAlignedWidgets 只含 search/datetime/news,
    bilibili_music 其实是 #widgets-wrap 的直接子节点,并不在 #information-widgets-right 里。
    旧版把 #widgets-wrap 的所有非右栏子节点绝对定位到左上角,
    结果 B站搜索框被缩小、半透明地钉在页面顶部(音乐窗口位置不对)。
@@ -1186,5 +1186,52 @@ body:not(.home-view) .nav-layout > .services-group.nav-active {
     height: auto !important;
     min-height: var(--news-panel-height, 300px) !important;
     overflow: visible !important;
+  }
+}
+
+/* ============ S2 原生交互无损增强(仅追加;不删除、不重排上方任何既有规则) ============
+   本块不引入任何新色值:涉及颜色处只用现有 CSS 变量 / currentColor / inherit。
+   全部为渐进增强,放在 @supports / @media 内,能力不足的浏览器自然忽略。 */
+
+/* 原生控件(滚动条、输入框)沿用 Head 中既有的 color-scheme 顺序,不写死明暗色值 */
+:root {
+  color-scheme: dark light;
+}
+
+/* 尊重「减少动态效果」偏好:命令面板关闭位移与过渡,仅保留静态显隐 */
+@media (prefers-reduced-motion: reduce) {
+  .command-palette,
+  .command-palette * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@supports selector(:has(*)) {
+  /* 仅当部件区出现「未登记部件」(带 widget-container 但没有 information-widget-* 类型类)
+     时才注册查询容器并兜底。默认首页部件均已登记,:has() 为假,默认布局逐字节不变。 */
+  body.home-view #widgets-wrap:has(> div.widget-container:not([class*="information-widget-"])) {
+    container-type: inline-size;
+    container-name: widgets-wrap;
+  }
+
+  /* :has() 兜底:旧规则把 #widgets-wrap 的非右栏直接子 div 绝对定位到左上角,
+     未登记部件因此被钉在顶部。这里复位为安全的静态定位,回归常规文档流。 */
+  body.home-view #widgets-wrap:has(> div.widget-container:not([class*="information-widget-"])) > div.widget-container:not([class*="information-widget-"]) {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* @container:窄容器下同样让未登记部件保持常规文档流,不叠加绝对定位 */
+  @container widgets-wrap (max-width: 640px) {
+    body.home-view #widgets-wrap > div.widget-container:not([class*="information-widget-"]) {
+      position: static !important;
+      top: auto !important;
+      left: auto !important;
+      transform: none !important;
+    }
   }
 }

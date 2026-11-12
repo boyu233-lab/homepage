@@ -72,7 +72,10 @@ describe("A2：4 个自定义 widget 端点接入公开读防护", () => {
   it.each(files)("%s 使用 withPublicWidgetGuard", (file) => {
     const code = source(`pages/api/widgets/${file}`);
     expect(code).toContain("withPublicWidgetGuard");
-    expect(code).toMatch(/export default withAuth\(withPublicWidgetGuard\(handler,/);
+    // S5 在 guard 与 handler 之间插入 withWidgetEnvelope。安全不变量不变：
+    // withAuth 仍在最外层，且 withPublicWidgetGuard 仍包住实际 handler 链。
+    expect(code).toMatch(/export default withAuth\(\s*withPublicWidgetGuard\(/);
+    expect(code).toMatch(/withPublicWidgetGuard\([\s\S]*handler[\s\S]*\)/);
   });
 
   it("音频端点使用最严格的 audio 策略", () => {

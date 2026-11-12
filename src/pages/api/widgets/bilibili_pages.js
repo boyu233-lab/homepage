@@ -3,6 +3,7 @@ import { BVID_PATTERN, loadView, pageLink } from "utils/bilibili-view";
 import { getPrivateWidgetOptions } from "utils/config/widget-helpers";
 import createLogger from "utils/logger";
 import { withPublicWidgetGuard } from "utils/rate-limit";
+import { classifyWidgetError, withWidgetEnvelope } from "utils/widget/envelope";
 
 const logger = createLogger("bilibili_pages");
 
@@ -54,4 +55,9 @@ async function handler(req, res) {
   });
 }
 
-export default withAuth(withPublicWidgetGuard(handler, "pages"));
+export default withAuth(
+  withPublicWidgetGuard(
+    withWidgetEnvelope(handler, { source: "bilibili_pages", ttlMs: 300_000, classify: classifyWidgetError }),
+    "pages",
+  ),
+);

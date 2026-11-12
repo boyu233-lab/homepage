@@ -4,7 +4,7 @@ import { authOptions } from "pages/api/auth/[...nextauth]";
 import { withAllowedHost } from "utils/auth";
 import { isAuthEnabled } from "utils/env";
 import createLogger from "utils/logger";
-import { handleMcpRequest, mcpEnabled, mcpTokenAuthorized, mcpTokenConfigError } from "utils/mcp/homepage-mcp";
+import { handleMcpRequest, mcpEnabled, mcpHttpStatus, mcpTokenAuthorized, mcpTokenConfigError } from "utils/mcp/homepage-mcp";
 
 async function hasHomepageSession(req, res) {
   if (!isAuthEnabled()) return false;
@@ -33,12 +33,12 @@ async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const response = handleMcpRequest(req.body);
+  const response = handleMcpRequest(req.body, req.headers);
   if (!response) {
     return res.status(202).end();
   }
 
-  return res.status(200).json(response);
+  return res.status(mcpHttpStatus(response)).json(response);
 }
 
 export default withAllowedHost(handler);

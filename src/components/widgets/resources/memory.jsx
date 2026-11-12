@@ -12,8 +12,8 @@ export default function Memory({ expanded, refresh = 1500 }) {
     refreshInterval: refresh,
   });
 
-  if (error || data?.error) {
-    return <Error />;
+  if (error || data?.error || data?._envelope?.state === "error") {
+    return <Error envelope={data?._envelope} />;
   }
 
   if (!data) {

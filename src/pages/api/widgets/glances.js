@@ -3,6 +3,7 @@ import { getPrivateWidgetOptions } from "utils/config/widget-helpers";
 import createLogger from "utils/logger";
 import { parseVersionForUrl } from "utils/proxy/api-helpers";
 import { httpProxy } from "utils/proxy/http";
+import { classifyWidgetError, withWidgetEnvelope } from "utils/widget/envelope";
 
 const logger = createLogger("glances");
 
@@ -78,4 +79,4 @@ async function handler(req, res) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withWidgetEnvelope(handler, { source: "glances", ttlMs: 30_000, classify: classifyWidgetError }));

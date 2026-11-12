@@ -42,6 +42,10 @@ const Version = dynamic(() => import("components/version"), {
   ssr: false,
 });
 
+const CommandPalette = dynamic(() => import("components/commandpalette/commandpalette"), {
+  ssr: false,
+});
+
 const rightAlignedWidgets = ["weatherapi", "openweathermap", "weather", "openmeteo", "search", "datetime", "news"];
 
 export const getServerSideProps = async () => ({ props: await getDashboardData() });
@@ -178,6 +182,7 @@ function Home({ initialSettings }) {
   const { data: services } = useSWR("/api/services");
   const { data: bookmarks } = useSWR("/api/bookmarks");
   const { data: widgets } = useSWR("/api/widgets");
+  const { data: profileData } = useSWR(settings?.profiles ? "/api/profiles" : null, { shouldRetryOnError: false });
 
   const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(
     (i) => i?.href,
@@ -406,6 +411,7 @@ function Home({ initialSettings }) {
           settings.fullWidth ? "" : "container",
           "relative m-auto flex flex-col justify-start z-10 h-full min-h-screen",
         )}
+        {...(profileData?.active ? { "data-profile": profileData.active } : {})}
       >
         {!quicklaunchDisabled && (
           <QuickLaunch
@@ -462,6 +468,8 @@ function Home({ initialSettings }) {
         </div>
 
         {servicesAndBookmarksGroups}
+
+        <CommandPalette />
 
         <div id="footer" className="flex flex-col mt-auto p-8 w-full">
           <div id="style" className="flex w-full justify-end">

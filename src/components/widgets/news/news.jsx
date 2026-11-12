@@ -1,6 +1,6 @@
 import classNames from "classnames";
 import { useSyncExternalStore } from "react";
-import { FiRefreshCw, FiTrendingUp } from "react-icons/fi";
+import { FiClock, FiRefreshCw, FiTrendingUp } from "react-icons/fi";
 import useSWR from "swr";
 
 import Container from "../widget/container";
@@ -98,6 +98,17 @@ function formatDateTime(value) {
   return `${pad(parsed.getMonth() + 1)}/${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 }
 
+// S5 陈旧角标用：把 fetchedAt 转成「X 分钟前 / X 小时前」的相对时间。
+function formatRelativeTime(value) {
+  if (!value) return "";
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return "";
+  const minutes = Math.max(0, Math.round((Date.now() - parsed) / 60000));
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  return `${Math.round(minutes / 60)} 小时前`;
+}
+
 function rightText(item, kind) {
   return kind === "news" ? formatDateTime(item.date) : formatHot(item.hotScore);
 }
@@ -164,6 +175,11 @@ export default function News({ options }) {
   const items = Array.isArray(data?.items) ? data.items : [];
   const visible = items.slice(0, maxItems);
 
+  // S5 数据契约：stale 态只显示一个轻量角标，不新增常驻大面板。
+  const envelope = data?._envelope;
+  const isStale = envelope?.state === "stale" || envelope?.stale === true;
+  const staleAge = formatRelativeTime(envelope?.fetchedAt);
+
   return (
     <Container options={options} additionalClassNames="information-widget-news">
       <Raw>
@@ -188,6 +204,15 @@ export default function News({ options }) {
             {data?.updatedAt && (
               <span className="news-item-time" style={{ flex: "none" }}>
                 更新于 {formatUpdateTime(data.updatedAt)}
+              </span>
+            )}
+            {isStale && (
+              <span
+                className="inline-flex flex-none items-center gap-1 rounded px-2 py-0.5 text-xs bg-theme-300/30 text-theme-600 dark:text-theme-300"
+                title={staleAge ? `数据获取于 ${staleAge}` : "数据为上次成功快照"}
+              >
+                <FiClock className="w-3 h-3" aria-hidden="true" />
+                陈旧{staleAge ? ` · ${staleAge}` : ""}
               </span>
             )}
             <button

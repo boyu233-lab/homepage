@@ -20,8 +20,8 @@ export default function Widget({ options }) {
     `/api/widgets/stocks?${new URLSearchParams({ lang: i18n.language, ...options }).toString()}`,
   );
 
-  if (error || data?.error) {
-    return <Error options={options} />;
+  if (error || data?.error || data?._envelope?.state === "error") {
+    return <Error options={options} envelope={data?._envelope} />;
   }
 
   if (!data) {

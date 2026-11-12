@@ -13,8 +13,8 @@ export default function Disk({ options, expanded, diskUnits, refresh = 1500 }) {
     refreshInterval: refresh,
   });
 
-  if (error || data?.error) {
-    return <Error options={options} />;
+  if (error || data?.error || data?._envelope?.state === "error") {
+    return <Error options={options} envelope={data?._envelope} />;
   }
 
   if (!data || !data.drive) {

@@ -33,8 +33,8 @@ export default function Widget({ options }) {
     },
   );
 
-  if (error || data?.error) {
-    return <Error options={options} />;
+  if (error || data?.error || data?._envelope?.state === "error") {
+    return <Error options={options} envelope={data?._envelope} />;
   }
 
   if (!data) {

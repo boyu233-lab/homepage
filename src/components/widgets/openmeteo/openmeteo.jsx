@@ -17,8 +17,8 @@ function Widget({ options }) {
 
   const { data, error } = useSWR(`/api/widgets/openmeteo?${new URLSearchParams({ ...options }).toString()}`);
 
-  if (error || data?.error) {
-    return <Error options={options} />;
+  if (error || data?.error || data?._envelope?.state === "error") {
+    return <Error options={options} envelope={data?._envelope} />;
   }
 
   if (!data) {

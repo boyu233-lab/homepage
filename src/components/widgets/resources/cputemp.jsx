@@ -16,8 +16,8 @@ export default function CpuTemp({ expanded, units, refresh = 1500, tempmin = 0, 
     refreshInterval: refresh,
   });
 
-  if (error || data?.error) {
-    return <Error />;
+  if (error || data?.error || data?._envelope?.state === "error") {
+    return <Error envelope={data?._envelope} />;
   }
 
   if (!data || !data.cputemp) {
