@@ -5,6 +5,61 @@
 
 ---
 
+## v1.3.0 — 2026-11-14
+
+**定位**：前沿能力增量（S1–S5）。在 v1.2.0 配置热更新的基础上，补齐 MCP 双协议代际兼容、浏览器原生 API 渐进增强、本地命令面板、情境 profiles、统一数据信封与失败降级。**全部是「默认不改变现有行为」的增量**：不配置时首页观感与 v1.2.0 一致；没有引入数据库、后台进程、多用户、实时推送或新框架，YAML 文件仍然是唯一数据源。
+
+注意 编号口径：项目内早期《后续优化升级执行方案》曾把 `v1.3.0` 预留给「端口与地基版」（H1–H15 扩展钩子 + O1 hash 盲区 + O2 白名单联动断言）。本版先行占用 `v1.3.0` 编号，那批工作顺延到后续版本，其技术方案与结论不受影响。
+
+### 变更（S1–S5）
+
+| 编号 | 能力 | 关键实现 |
+|---|---|---|
+| S1 | MCP dual-era 协议兼容 | `src/utils/mcp/homepage-mcp.js` 与 `src/pages/api/mcp/index.js`：legacy `2025-11-25` 逐字节兼容；modern `2026-07-28` 要求每请求带 `_meta["io.modelcontextprotocol/protocolVersion"]` 与 `clientCapabilities`，实现 `server/discover`、`Mcp-Method` / `Mcp-Name` 三头部路由、`-32602` / `-32020` / `-32022` 错误码与 HTTP 400 映射；结果附 `resultType` / `ttlMs` / `cacheScope`。`/api/mcp` 本就无状态，改造限于这两个文件 |
+| S2 | 浏览器原生 API 渐进增强 | `custom.css` 追加 46 行（原生 `:has()` / `color-mix()` / 容器查询等能力检测），零新增色值、`src/skeleton` 与 `deploy/config-template` 两份 sha256 一致；属于配置层，走管理页网页上传即可生效，不需要换镜像 |
+| S3 | 本地命令面板 | `src/components/commandpalette/commandpalette.jsx`：`Ctrl/Cmd+K` 或 `/` 唤起，复用 `/api/bookmarks` + `/api/services` 两个既有 SWR 源，**零新增 API 请求**；按名称前缀/包含、abbr、分组名、URL 加权打分，localStorage 记录使用频率；最多 8 条，方向键 / 回车 / Esc 齐全。未唤起时首页零变化 |
+| S4 | 情境 profiles | `src/utils/profiles/resolve.js` + `/api/profiles`：`settings.yaml` 可选 `profiles`，按 network / time 规则推导 `active`，首页根容器写 `data-profile`；接口走 `withAuth`，缺省或解析失败一律返回 `{active:null,profiles:[]}`，不抛错、不改首页 |
+| S5 | 统一数据信封与失败降级 | `src/utils/widget/envelope.js` 的 `withWidgetEnvelope`：降级 200 响应附 `_envelope`（`source` / `fetchedAt` / `ageMs` / `stale` / `state` / `error`），`state` 为 `fresh`/`stale`/`error`，`error.kind` 六类；接入 news / openmeteo / stocks / glances / bilibili_pages / resources；进程内 Map 快照、不落盘；新增只读 `GET /api/health/sources`；9 个 widget 组件补错误态透传，避免 `200 + state=error` 时卡片崩。**成功体与参数校验 4xx 逐字节原样，不带 `_envelope`** |
+
+### 新增环境变量（全部可选，不设即用默认）
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `HOMEPAGE_MCP_ENABLED` | `false` | 开启后 `/api/mcp` 才存在，关闭时返回 404 是正常结果 |
+| `HOMEPAGE_MCP_TOKEN` | 无 | 至少 32 字符（`openssl rand -base64 32`）；短于 32 时接口返回 500 `MCP token is misconfigured`，属刻意收紧 |
+| `HOMEPAGE_MCP_ALLOW_WRITE` | `false` | MCP 配置写开关，默认只读 |
+| `HOMEPAGE_PUBLIC_READ_PATHS` | 无 | 需要外网未登录读取 S4 时追加 `/api/profiles`；**严禁**加入 `/api/config/upload`、`/api/config/bookmarks`、`/api/services/proxy`、`/api/revalidate`、`/api/mcp` |
+
+### 升级规则（重要）
+
+- **本次必须换镜像**（改了 `src/` 下的 React 与 API），镜像 tag 改 `:v1.3.0`。
+- **零配置文件覆盖**：9 个 YAML / CSS / JS 全部保持原样，不需要 SSH 覆盖文件、不需要重启以外的额外动作。
+- S2 样式是**可选追加块**：把 `可选/custom.css-S2-追加块.css` 追加到 `custom.css` 末尾再从管理页上传；不追加只是该增强不生效。
+- MCP 默认关闭，S1 不配也不会影响首页。
+- 回滚：镜像 tag 改回 `:v1.2.0`，无需回滚任何配置文件。
+
+### 测试与验收
+
+- 全量 Vitest **593 文件 / 2165 用例全通过**；全量 ESLint 0 错误；`pnpm build` exit 0；构建产物路由表含 `/api/profiles` 与 `/api/health/sources`；P0 门禁与脱敏扫描零命中。
+- 新增/修正测试：命令行与 dual-era 协议（14/14）、widget 信封、profiles、错误态透传；`v1.1-hardening.test.js` 改为断言 `withAuth` 最外层与 `withPublicWidgetGuard` 包住 handler 链这一安全不变量，不削弱防护。
+- 本机真容器冒烟 10 端点全绿（挂载配置目录、4180 端口、`HOMEPAGE_ALLOWED_HOSTS` 显式配置）。
+- 第二台 NAS 实机验证：9/9 端点绿，`/api/validate` 返回 `[]`，S3 命令面板浏览器手测通过（分组索引、键盘选中、8 条上限），S4 返回中性态，S5 已有 `state:"fresh"` 记录。
+
+### 发布坐标
+
+待回填（构建与推送完成后以独立 docs commit 补入：镜像 digest、git commit / tag、离线 tar sha256、交付物清单）。
+
+### 已知限制
+
+- `_envelope` **只在降级 200 响应中出现**；成功体与参数校验 4xx 不带该字段。
+- `glances` 上游 401/500 仍保持原 400，属部分覆盖；完整降级为 news / openmeteo / stocks / bilibili_pages / resources 五源。
+- 健康面板本轮不做 UI，只有只读端点 `/api/health/sources`；快照是进程内状态，容器重启后清空，多副本各自独立。
+- `customapi` 仍因匿名 SSRF 风险在生产禁用。
+- `kubernetes.yaml` / `proxmox.yaml` 不在 `/api/hash` 监听列表内，改完需手动刷首页。
+- 明确不做：163 个服务集成 widget 的批量启用（它们是外部应用的数据显示窗，不是导航页功能）、多用户本体 / RBAC、拖拽配置中心、WS/SSE、PostgreSQL/Redis、本地 LLM、本地优先同步引擎。
+
+---
+
 ## v1.2.0 — 2026-11-10
 
 **定位**：配置热更新（网页上传文件）。管理页新增「配置更新」页签，登录后可直接上传 9 个配置文件，服务端自动校验、备份、原子写并清缓存，首页自动刷新。**本次改的是 `src/` 下的 API 与页面，必须换一次镜像；换完之后日常改书签、样式、部件配置全部走网页上传，不再拉镜像、不再 SSH 覆盖文件、不用重启容器。** 所有既有配置文件一个都不用覆盖。
