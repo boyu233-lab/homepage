@@ -47,7 +47,13 @@
 
 ### 发布坐标
 
-待回填（构建与推送完成后以独立 docs commit 补入：镜像 digest、git commit / tag、离线 tar sha256、交付物清单）。
+- 镜像 `:v1.3.0` = `:latest` = `:sha-73ba04d`，digest `sha256:72cbd218081d8a325465e36f5b18ebc251bd69b2f0bf49052dd66fa0d2c3854d`（Docker Hub Registry API 三标签核验一致）；架构 `linux/amd64`，378MB。
+- 代码 commit `07fc76e`，定版 commit `73ba04d`；git annotated tag `v1.3.0` 指向 `73ba04d`；`dev` / `feat/bookmark-manager` / `feat/v1.3.0-frontier` 三分支均已同步到该定版提交，本段坐标回填为后续独立 docs commit。
+- `VERSION` = `1.3.0`；`package.json` 的 `2.7.0` 是上游版本，未动。
+- 离线镜像 `homepage-image-v1.3.0.tar`（81MB，sha256 `f56a2230782657e45509aaa055ac766b2b7d55522f665caed4807289b1975f8d`）。
+- 发布前验证：镜像内联 `NEXT_PUBLIC_VERSION=v1.3.0`、无 `frontier-test` 残留；本机容器冒烟 7/7 端点绿（`/`、`/api/healthcheck`、`/api/validate`、`/api/hash`、`/api/widgets`、`/api/profiles`、`/api/health/sources`）。
+- `:v1.2.0` 保持旧 digest `63944f17…` 未变；**`:latest` 本次由 v1.2.0 前移到 v1.3.0**，回滚请用显式 tag `:v1.2.0`，不要依赖 `:latest`。
+- 发版 CI（`docker-publish-fork.yml`）虽配置为 `push tags: v*` 触发，但该工作流在本仓库历史运行数为 0、本次 tag 推送也未触发任何 run，因此镜像由本机构建并推送，未走多架构 CI。
 
 ### 已知限制
 
